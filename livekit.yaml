@@ -6,8 +6,8 @@ rtc:
 redis:
   address: redis:6379
 keys:
-  devkey: devsecret
+  APIoSBh5JqSGNUC: Y4A9W5VgUcmedACbKKH49FXFzKuMVXqZofrc2B2q1R6
 webhook:
-  api_key: devkey
+  api_key: APIoSBh5JqSGNUC
 logging:
   level: info
