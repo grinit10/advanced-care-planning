@@ -8,9 +8,10 @@ export interface TranscriptMessage {
 
 interface TranscriptPanelProps {
   messages: TranscriptMessage[];
+  agentSpeaking?: boolean;
 }
 
-export default function TranscriptPanel({ messages }: TranscriptPanelProps) {
+export default function TranscriptPanel({ messages, agentSpeaking }: TranscriptPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll when new messages arrive
@@ -29,14 +30,20 @@ export default function TranscriptPanel({ messages }: TranscriptPanelProps) {
         </div>
       )}
 
-      {messages.map((msg) => (
-        <div key={msg.id} className={`transcript-msg msg-${msg.role}`}>
-          <span className="msg-label">
-            {msg.role === "agent" ? "Assistant" : "You"}
-          </span>
-          <p>{msg.text}</p>
-        </div>
-      ))}
+      {messages.map((msg, idx) => {
+        const isLastAgent = msg.role === "agent" && idx === messages.length - 1;
+        return (
+          <div
+            key={msg.id}
+            className={`transcript-msg msg-${msg.role}${isLastAgent && agentSpeaking ? " speaking" : ""}`}
+          >
+            <span className="msg-label">
+              {msg.role === "agent" ? "Assistant" : "You"}
+            </span>
+            <p>{msg.text}</p>
+          </div>
+        );
+      })}
       <div ref={bottomRef} />
     </div>
   );

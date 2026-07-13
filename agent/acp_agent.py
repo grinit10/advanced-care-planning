@@ -18,12 +18,17 @@ DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 
 
 def create_llm() -> openai.LLM:
-    """Create an Azure OpenAI LLM instance."""
+    """Create an Azure OpenAI LLM instance.
+
+    Uses a slightly elevated temperature (0.7) for more varied,
+    natural-sounding speech rather than robotic repetition.
+    """
     return openai.LLM(
         base_url=f"{AZURE_ENDPOINT}/openai/deployments/{AZURE_LLM_DEPLOYMENT}",
         api_key=AZURE_API_KEY,
         model=AZURE_LLM_DEPLOYMENT,
         extra_query={"api-version": AZURE_API_VERSION},
+        temperature=0.85,
     )
 
 
@@ -63,7 +68,7 @@ def create_tts() -> deepgram.TTS:
     All voice data stays in Australia (AWS ap-southeast-2, Sydney).
     """
     return deepgram.TTS(
-        model="aura-asteria-en",
+        model="aura-2-asteria-en",
         api_key=DEEPGRAM_API_KEY,
         base_url="https://api.au.deepgram.com/v1/speak",
         # 24kHz sample rate for high-quality audio

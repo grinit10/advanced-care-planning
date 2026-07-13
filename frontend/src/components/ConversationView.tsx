@@ -3,6 +3,7 @@ import TranscriptPanel, { TranscriptMessage } from "./TranscriptPanel";
 
 interface ConversationViewProps {
   transcript: TranscriptMessage[];
+  agentSpeaking: boolean;
   onRegisterEmail: (email: string) => Promise<{ success: boolean; message: string }>;
   onSendPlan: () => Promise<{ status: string; message: string }>;
   onCloseSession: () => Promise<{ success: boolean; message: string }>;
@@ -13,6 +14,7 @@ type PanelMode = "conversation" | "plan";
 
 export default function ConversationView({
   transcript,
+  agentSpeaking,
   onRegisterEmail,
   onSendPlan,
   onCloseSession,
@@ -139,8 +141,21 @@ export default function ConversationView({
     <div className="conversation">
       <header className="conversation-header">
         <div className="conversation-status">
-          <span className="status-dot" />
-          <span>Assistant is listening...</span>
+          <span className={`status-dot ${agentSpeaking ? "speaking" : ""}`} />
+          {agentSpeaking ? (
+            <div className="speaking-indicator">
+              <span className="speaking-label">Assistant is speaking</span>
+              <div className="waveform">
+                <span className="waveform-bar" />
+                <span className="waveform-bar" />
+                <span className="waveform-bar" />
+                <span className="waveform-bar" />
+                <span className="waveform-bar" />
+              </div>
+            </div>
+          ) : (
+            <span>Assistant is listening...</span>
+          )}
         </div>
         <div className="header-actions">
           <button className="btn-plan" onClick={() => setMode("plan")}>
@@ -152,7 +167,7 @@ export default function ConversationView({
         </div>
       </header>
 
-      <TranscriptPanel messages={transcript} />
+      <TranscriptPanel messages={transcript} agentSpeaking={agentSpeaking} />
 
       <footer className="conversation-footer">
         <div className="mic-indicator">

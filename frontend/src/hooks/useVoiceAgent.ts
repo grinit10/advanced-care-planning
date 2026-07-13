@@ -30,6 +30,7 @@ export interface SendResult {
 export function useVoiceAgent() {
   const [connecting, setConnecting] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [roomId, setRoomId] = useState<string>("");
   const roomRef = useRef<Room | null>(null);
@@ -81,6 +82,12 @@ export function useVoiceAgent() {
               audioEl.remove();
             }
           }
+        });
+
+        // Detect when the agent is speaking via active speaker changes
+        room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          const agentSpeaker = speakers.find((p) => p.identity?.startsWith("agent-"));
+          setAgentSpeaking(!!agentSpeaker);
         });
 
         await room.connect(LIVEKIT_URL, token);
@@ -183,6 +190,7 @@ export function useVoiceAgent() {
   return {
     connecting,
     connected,
+    agentSpeaking,
     transcript,
     roomId,
     connect,

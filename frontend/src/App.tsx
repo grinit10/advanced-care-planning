@@ -7,6 +7,7 @@ export default function App() {
   const {
     connecting,
     connected,
+    agentSpeaking,
     transcript,
     connect,
     disconnect,
@@ -77,6 +78,7 @@ export default function App() {
     <div className="app">
       <ConversationView
         transcript={transcript}
+        agentSpeaking={agentSpeaking}
         onRegisterEmail={handleRegisterEmail}
         onSendPlan={handleSendPlan}
         onCloseSession={handleCloseSession}

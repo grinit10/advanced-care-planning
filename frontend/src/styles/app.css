@@ -217,6 +217,88 @@ body {
   }
 }
 
+.status-dot.speaking {
+  background: #22c55e;
+  animation: speak-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes speak-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+}
+
+/* --- Speaking Indicator --- */
+.speaking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.speaking-label {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+}
+
+.waveform-bar {
+  display: block;
+  width: 4px;
+  background: var(--color-primary);
+  border-radius: 2px;
+  animation: waveform 0.6s ease-in-out infinite;
+}
+
+.waveform-bar:nth-child(1) {
+  height: 8px;
+  animation-delay: 0s;
+}
+
+.waveform-bar:nth-child(2) {
+  height: 14px;
+  animation-delay: 0.1s;
+}
+
+.waveform-bar:nth-child(3) {
+  height: 20px;
+  animation-delay: 0.2s;
+}
+
+.waveform-bar:nth-child(4) {
+  height: 14px;
+  animation-delay: 0.3s;
+}
+
+.waveform-bar:nth-child(5) {
+  height: 8px;
+  animation-delay: 0.4s;
+}
+
+@keyframes waveform {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 .btn-end {
   padding: 0.5rem 1rem;
   background: transparent;
@@ -281,6 +363,12 @@ body {
   align-self: flex-start;
   background: var(--color-agent-msg);
   border-bottom-left-radius: 4px;
+}
+
+.msg-agent.speaking {
+  background: #e8f0fe;
+  border-left: 3px solid var(--color-primary);
+  transition: background 0.3s, border-left 0.3s;
 }
 
 .msg-user {
