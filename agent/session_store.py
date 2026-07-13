@@ -103,19 +103,41 @@ class SessionStore:
     # --- Preferences ---
 
     async def set_preference(self, room_id: str, key: str, value: str):
+        """Set a single preference key-value pair (flat string storage)."""
         await self._redis.hset(
             self._key(room_id, "preferences"), key, value
         )
 
     async def get_preferences(self, room_id: str) -> dict:
+        """Get all preferences. Returns a flat dict from Redis."""
         raw = await self._redis.hgetall(self._key(room_id, "preferences"))
         return raw or {}
 
     async def set_preferences_bulk(self, room_id: str, prefs: dict):
+        """Set multiple flat preference key-value pairs."""
         if prefs:
             await self._redis.hset(
                 self._key(room_id, "preferences"), mapping=prefs
             )
+
+    async def get_preferences_json(self, room_id: str) -> dict:
+        """Get the full nested preferences JSON object."""
+        raw = await self._redis.get(self._key(room_id, "preferences_json"))
+        if raw:
+            import json
+            try:
+                return json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return {}
+
+    async def save_preferences_json(self, room_id: str, prefs: dict):
+        """Save the full nested preferences JSON object (replaces entirely)."""
+        import json
+        await self._redis.set(
+            self._key(room_id, "preferences_json"),
+            json.dumps(prefs, default=str),
+        )
 
     # --- Emails ---
 
@@ -185,6 +207,7 @@ class SessionStore:
             "status": await self.get_status(room_id),
             "transcript": await self.get_transcript(room_id),
             "preferences": await self.get_preferences(room_id),
+            "preferences_json": await self.get_preferences_json(room_id),
             "emails": await self.get_emails(room_id),
             "audio_path": await self.get_audio_path(room_id),
             "plan_summary": await self.get_plan_summary(room_id),

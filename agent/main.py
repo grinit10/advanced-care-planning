@@ -33,6 +33,7 @@ from acp_agent import (
 )
 from audio_recorder import ConversationRecorder
 from http_server import init as init_http_server, run_server as run_http_server
+from preference_extractor import EMPTY_PREFERENCES, extract_preferences
 from session_store import SessionStore, TranscriptEntry
 
 # Load .env from the project root
@@ -58,13 +59,16 @@ class ACPAgent(Agent):
     to manage transcripts, recordings, and session cleanup.
     """
 
-    def __init__(self, chat_ctx, room_id: str):
+    def __init__(self, chat_ctx, room_id: str, llm_instance: llm.LLM):
         super().__init__(
             instructions="",  # instructions not used — chat_ctx carries the system prompt
             chat_ctx=chat_ctx,
         )
         self.room_id = room_id
         self.last_msg_count = 0
+        self._llm = llm_instance
+        self._tasks = set()
+        self._pref_lock = asyncio.Lock()
 
     async def on_enter(self):
         """Called when the agent session starts — greet the user."""
@@ -107,6 +111,55 @@ class ACPAgent(Agent):
             await session_store.add_transcript_entry(self.room_id, entry)
         self.last_msg_count = len(msgs)
 
+        # Fire background preference extraction (doesn't block conversation)
+        task = asyncio.create_task(self._extract_preferences())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def _extract_preferences(self):
+        """Extract structured preferences from the latest exchange asynchronously."""
+        async with self._pref_lock:
+            try:
+                # Get the latest user+agent exchange
+                msgs = self.chat_ctx.messages()
+                if len(msgs) < 2:
+                    return
+
+                # Build exchange text from the last pair of messages
+                exchange_parts = []
+                for msg in msgs[-4:]:  # last 2 turns (user + agent = 4 messages)
+                    role = "User" if msg.role == "user" else "Assistant"
+                    text = " ".join(
+                        c for c in (msg.content or [])
+                        if isinstance(c, str)
+                    ) or ""
+                    if text.strip():
+                        exchange_parts.append(f"{role}: {text.strip()}")
+
+                exchange = "\n".join(exchange_parts)
+                if not exchange.strip():
+                    return
+
+                # Get existing preferences from Redis
+                existing = await session_store.get_preferences_json(self.room_id)
+
+                # Extract new preferences
+                updated = await extract_preferences(
+                    self._llm,
+                    exchange,
+                    existing_prefs=existing or EMPTY_PREFERENCES,
+                )
+
+                # Save back to Redis
+                if updated:
+                    await session_store.save_preferences_json(self.room_id, updated)
+                    logger.info(
+                        "Extracted preferences for session %s",
+                        self.room_id,
+                    )
+            except Exception as e:
+                logger.error("Preference extraction error: %s", e)
+
     async def on_exit(self):
         """Called when the agent session ends — clean up recording."""
         await _cleanup_session(self.room_id)
@@ -144,10 +197,14 @@ async def entrypoint(job: JobContext):
     await recorder.start()
     _active_recorders[room_id] = recorder
 
+    # Create the LLM instance (shared by conversation and preference extraction)
+    llm_instance = create_llm()
+
     # Create the agent instance (captures conversation logic)
     agent = ACPAgent(
         chat_ctx=create_initial_context(),
         room_id=room_id,
+        llm_instance=llm_instance,
     )
 
     # Create the agent session (runtime that manages VAD → STT → LLM → TTS)
@@ -162,7 +219,7 @@ async def entrypoint(job: JobContext):
     session = AgentSession(
         vad=job.proc.userdata["vad"],
         stt=create_stt(),
-        llm=create_llm(),
+        llm=llm_instance,
         tts=tts,
         turn_handling={
             # Enable interruptions — user can cut in at any time

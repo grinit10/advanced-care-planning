@@ -59,64 +59,227 @@ async def _get_store() -> SessionStore:
     return _store
 
 
-# --- Helper: generate plan summary via LLM ---
+# --- Helper: generate plan summary from pre-extracted preferences ---
+
+def _pref_value(val) -> str:
+    """Format a preference value for display."""
+    if val is None:
+        return "Not yet discussed"
+    if isinstance(val, bool):
+        return "Yes" if val else "No"
+    if isinstance(val, list):
+        if not val:
+            return "None specified"
+        if len(val) == 1:
+            return str(val[0])
+        return ", ".join(str(v) for v in val)
+    if isinstance(val, str):
+        return val.strip() or "Not yet discussed"
+    return str(val)
+
+
+def _build_summary_from_prefs(prefs: dict) -> str:
+    """Build a rich plain-text summary from pre-extracted preferences."""
+    parts = [
+        "Here is a summary of what we discussed during your Advanced Care Planning conversation.\n"
+    ]
+
+    # Substitute Decision-Maker
+    sdm = prefs.get("substitute_decision_maker", {})
+    if sdm.get("discussed"):
+        parts.append("SUBSTITUTE DECISION-MAKER")
+        if sdm.get("name"):
+            parts.append(f"  Who: {sdm['name']}")
+        if sdm.get("relationship"):
+            parts.append(f"  Relationship: {sdm['relationship']}")
+        if sdm.get("notes"):
+            parts.append(f"  Notes: {sdm['notes']}")
+        parts.append("")
+
+    # Quality of Life
+    qol = prefs.get("quality_of_life", {})
+    if qol.get("discussed"):
+        parts.append("QUALITY OF LIFE")
+        vals = qol.get("values", [])
+        if vals:
+            parts.append(f"  What matters: {_pref_value(vals)}")
+        fears = qol.get("fears", [])
+        if fears:
+            parts.append(f"  Concerns: {_pref_value(fears)}")
+        if qol.get("notes"):
+            parts.append(f"  Notes: {qol['notes']}")
+        parts.append("")
+
+    # Treatment Preferences
+    tx = prefs.get("treatment_preferences", {})
+    if tx.get("discussed"):
+        parts.append("TREATMENT PREFERENCES")
+        for key, label in [
+            ("life_support", "Life support"),
+            ("cpr", "CPR"),
+            ("feeding_tubes", "Feeding tubes"),
+            ("pain_management", "Pain management"),
+        ]:
+            val = tx.get(key)
+            if val is not None:
+                parts.append(f"  {label}: {_pref_value(val)}")
+        if tx.get("notes"):
+            parts.append(f"  Notes: {tx['notes']}")
+        parts.append("")
+
+    # Personal Beliefs
+    beliefs = prefs.get("personal_beliefs", {})
+    if beliefs.get("discussed"):
+        parts.append("PERSONAL VALUES AND BELIEFS")
+        if beliefs.get("faith_role"):
+            parts.append(f"  Faith/Spirituality: {beliefs['faith_role']}")
+        cult = beliefs.get("cultural_values", [])
+        if cult:
+            parts.append(f"  Cultural values: {_pref_value(cult)}")
+        if beliefs.get("notes"):
+            parts.append(f"  Notes: {beliefs['notes']}")
+        parts.append("")
+
+    # Specific Scenarios
+    scenarios = prefs.get("specific_scenarios", {})
+    if scenarios.get("discussed"):
+        parts.append("SPECIFIC SCENARIOS")
+        for key, label in [
+            ("dementia", "Advanced dementia"),
+            ("coma", "Persistent coma"),
+            ("terminal_illness", "Terminal illness"),
+        ]:
+            val = scenarios.get(key)
+            if val is not None:
+                parts.append(f"  {label}: {_pref_value(val)}")
+        if scenarios.get("notes"):
+            parts.append(f"  Notes: {scenarios['notes']}")
+        parts.append("")
+
+    # Dignity & Values
+    dignity = prefs.get("dignity_and_values", {})
+    if dignity.get("discussed"):
+        parts.append("DIGNITY AND VALUES")
+        meaning = dignity.get("meaning_of_life", [])
+        if meaning:
+            parts.append(f"  What gives life meaning: {_pref_value(meaning)}")
+        if dignity.get("dignity_definition"):
+            parts.append(f"  Definition of dignity: {dignity['dignity_definition']}")
+        if dignity.get("notes"):
+            parts.append(f"  Notes: {dignity['notes']}")
+        parts.append("")
+
+    # Check if anything was discussed
+    if len(parts) == 1:
+        parts.append(
+            "The conversation was still in its early stages. "
+            "No specific preferences were captured yet."
+        )
+
+    return "\n".join(parts)
+
 
 async def _generate_summary(room_id: str) -> str:
-    """Generate a plain-text summary of ACP preferences from the transcript."""
+    """Generate a plan summary from pre-extracted preferences."""
     store = await _get_store()
     transcript = await store.get_transcript(room_id)
 
     if not transcript:
         return "The conversation was too short to generate a summary."
 
-    # Build a concise summary from the transcript content
-    # Extract key topics discussed
-    topics_discussed = set()
-    for entry in transcript:
-        text = entry.get("text", "").lower()
-        if "substitute decision-maker" in text or "power of attorney" in text:
-            topics_discussed.add("Substitute Decision-Maker")
-        if "life support" in text or "ventilator" in text or "cpr" in text:
-            topics_discussed.add("Life-Sustaining Treatment Preferences")
-        if "quality of life" in text:
-            topics_discussed.add("Quality of Life Values")
-        if "dementia" in text or "coma" in text:
-            topics_discussed.add("Specific Scenarios (Dementia/Coma)")
-        if "palliative" in text or "comfort" in text or "pain" in text:
-            topics_discussed.add("Palliative and Comfort Care")
-        if "values" in text or "belief" in text or "faith" in text or "religion" in text:
-            topics_discussed.add("Personal Values and Beliefs")
-        if "terminal" in text or "end of life" in text:
-            topics_discussed.add("End-of-Life Care Preferences")
-
-    summary_parts = [
-        "You had a conversation about your future healthcare wishes. "
-        "Here is a summary of what was discussed:\n"
-    ]
-
-    if topics_discussed:
-        summary_parts.append(
-            "Topics covered:\n" +
-            "\n".join(f"  - {t}" for t in sorted(topics_discussed))
-        )
+    # Use pre-extracted preferences if available, fall back to transcript
+    prefs = await store.get_preferences_json(room_id)
+    if prefs:
+        summary = _build_summary_from_prefs(prefs)
     else:
-        summary_parts.append(
+        summary = (
             "The conversation was exploratory in nature. "
             "Topics included general values and preferences for future healthcare."
         )
 
-    summary_parts.append(
+    summary += (
         f"\n\nThe conversation had {len(transcript)} exchanges. "
-        "Your full transcript and any extracted preferences are included below."
+        "Your full transcript is included below."
     )
 
-    return "\n".join(summary_parts)
+    return summary
 
 
 # --- Route handlers ---
 
 async def handle_health(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
+
+
+async def handle_get_recording(request: web.Request) -> web.Response:
+    """Serve the conversation audio recording as a downloadable WAV file."""
+    room_id = request.match_info["room_id"]
+    store = await _get_store()
+    audio_path = await store.get_audio_path(room_id)
+
+    if not audio_path or not os.path.exists(audio_path):
+        return web.json_response(
+            {"error": "Recording not available"}, status=404
+        )
+
+    filename = f"acp-conversation-{room_id}.wav"
+    return web.FileResponse(
+        path=audio_path,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "audio/wav",
+        },
+    )
+
+
+async def handle_get_transcript_download(request: web.Request) -> web.Response:
+    """Return the transcript as plain text for download."""
+    room_id = request.match_info["room_id"]
+    store = await _get_store()
+    transcript = await store.get_transcript(room_id)
+
+    if not transcript:
+        return web.json_response(
+            {"error": "Transcript not available"}, status=404
+        )
+
+    lines = []
+    for entry in transcript:
+        role = "You" if entry.get("role") == "user" else "Assistant"
+        text = entry.get("text", "")
+        lines.append(f"[{role}] {text}")
+
+    text = "\n\n".join(lines)
+    filename = f"acp-transcript-{room_id}.txt"
+    return web.Response(
+        body=text,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "text/plain; charset=utf-8",
+        },
+    )
+
+
+async def handle_get_transcript_json(request: web.Request) -> web.Response:
+    """Return the transcript as JSON for live polling."""
+    room_id = request.match_info["room_id"]
+    store = await _get_store()
+    transcript = await store.get_transcript(room_id)
+    return web.json_response({
+        "room_id": room_id,
+        "transcript": transcript or [],
+    })
+
+
+async def handle_get_preferences(request: web.Request) -> web.Response:
+    """Return the live-extracted preferences JSON for a session."""
+    room_id = request.match_info["room_id"]
+    store = await _get_store()
+    prefs = await store.get_preferences_json(room_id)
+    return web.json_response({
+        "room_id": room_id,
+        "preferences": prefs if prefs else {},
+    })
 
 
 async def handle_get_plan(request: web.Request) -> web.Response:
@@ -270,7 +433,11 @@ def create_app() -> web.Application:
     """Create the aiohttp application."""
     app = web.Application(middlewares=[cors_middleware])
     app.router.add_get("/health", handle_health)
+    app.router.add_get("/preferences/{room_id}", handle_get_preferences)
     app.router.add_get("/plan/{room_id}", handle_get_plan)
+    app.router.add_get("/recording/{room_id}", handle_get_recording)
+    app.router.add_get("/transcript/{room_id}", handle_get_transcript_download)
+    app.router.add_get("/transcript-json/{room_id}", handle_get_transcript_json)
     app.router.add_post("/email/{room_id}", handle_add_email)
     app.router.add_post("/send-plan/{room_id}", handle_send_plan)
     app.router.add_post("/close/{room_id}", handle_close)

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Room, RoomEvent, createLocalAudioTrack } from "livekit-client";
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL ?? "ws://localhost:7880";
@@ -33,7 +33,18 @@ export function useVoiceAgent() {
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [roomId, setRoomId] = useState<string>("");
+  const [preferences, setPreferences] = useState<Record<string, unknown>>({});
   const roomRef = useRef<Room | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+    };
+  }, []);
 
   const addTranscript = useCallback(
     (msg: TranscriptMessage) => {
@@ -41,6 +52,60 @@ export function useVoiceAgent() {
     },
     []
   );
+
+  const fetchTranscript = useCallback(async (currentRoomId: string) => {
+    try {
+      const res = await fetch(
+        `${AGENT_API_URL}/transcript-json/${encodeURIComponent(currentRoomId)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.transcript && Array.isArray(data.transcript)) {
+          setTranscript((prev) => {
+            // Only update if there are new entries
+            if (data.transcript.length <= prev.length) return prev;
+            return data.transcript.map((entry: { role: string; text: string }, idx: number) => ({
+              id: idx + 1,
+              role: entry.role as "agent" | "user",
+              text: entry.text,
+            }));
+          });
+        }
+      }
+    } catch {
+      // Silently fail — polling will retry
+    }
+  }, []);
+
+  const fetchPreferences = useCallback(async (currentRoomId: string) => {
+    try {
+      const res = await fetch(
+        `${AGENT_API_URL}/preferences/${encodeURIComponent(currentRoomId)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.preferences && Object.keys(data.preferences).length > 0) {
+          setPreferences(data.preferences);
+        }
+      }
+    } catch {
+      // Silently fail — polling will retry
+    }
+  }, []);
+
+  const startPolling = useCallback((currentRoomId: string) => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+    }
+    // Poll every 3 seconds for live transcript and preference updates
+    pollRef.current = setInterval(() => {
+      fetchTranscript(currentRoomId);
+      fetchPreferences(currentRoomId);
+    }, 3000);
+    // Also fetch immediately
+    fetchTranscript(currentRoomId);
+    fetchPreferences(currentRoomId);
+  }, [fetchTranscript, fetchPreferences]);
 
   const connect = useCallback(
     async (roomName: string, identity: string) => {
@@ -61,13 +126,14 @@ export function useVoiceAgent() {
 
         room.on(RoomEvent.Disconnected, () => {
           setConnected(false);
+          setTranscript([]);
         });
 
         room.on(RoomEvent.TrackSubscribed, (track) => {
           if (track.kind === "audio") {
             // Play agent's voice by attaching audio track to an <audio> element
             const audioEl = document.createElement("audio");
-            audioEl.id = "agent-audio";
+            audioEl.id = `agent-audio-${track.sid}`;
             audioEl.autoplay = true;
             track.attach(audioEl);
             document.body.appendChild(audioEl);
@@ -76,7 +142,7 @@ export function useVoiceAgent() {
 
         room.on(RoomEvent.TrackUnsubscribed, (track) => {
           if (track.kind === "audio") {
-            const audioEl = document.getElementById("agent-audio") as HTMLMediaElement | null;
+            const audioEl = document.getElementById(`agent-audio-${track.sid}`) as HTMLMediaElement | null;
             if (audioEl) {
               track.detach(audioEl);
               audioEl.remove();
@@ -105,6 +171,10 @@ export function useVoiceAgent() {
         setRoomId(roomName);
         setConnected(true);
 
+        // Start polling for live preferences
+        setPreferences({});
+        startPolling(roomName);
+
         addTranscript({
           id: Date.now(),
           role: "agent",
@@ -122,10 +192,15 @@ export function useVoiceAgent() {
   );
 
   const disconnect = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
     roomRef.current?.disconnect();
     roomRef.current = null;
     setConnected(false);
     setRoomId("");
+    setPreferences({});
   }, []);
 
   // --- Session API calls ---
@@ -192,6 +267,7 @@ export function useVoiceAgent() {
     connected,
     agentSpeaking,
     transcript,
+    preferences,
     roomId,
     connect,
     disconnect,

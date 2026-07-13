@@ -1,21 +1,48 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import PreJoin from "./components/PreJoin";
 import ConversationView from "./components/ConversationView";
 import { useVoiceAgent } from "./hooks/useVoiceAgent";
 
+type Theme = "light" | "dark";
+
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem("acp-theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [error, setError] = useState<string | null>(null);
+
   const {
     connecting,
     connected,
     agentSpeaking,
     transcript,
+    preferences,
+    roomId,
     connect,
     disconnect,
     registerEmail,
     sendPlan,
     closeSession,
   } = useVoiceAgent();
-  const [error, setError] = useState<string | null>(null);
+
+  // Apply theme to <html> and persist to localStorage
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+    localStorage.setItem("acp-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => (t === "light" ? "dark" : "light"));
+  }, []);
 
   const handleJoin = useCallback(
     async (roomName: string, identity: string) => {
@@ -52,6 +79,9 @@ export default function App() {
   if (error) {
     return (
       <div className="app">
+        <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === "light" ? "🌙" : "☀️"}
+        </button>
         <div className="error-view">
           <h2>Connection Error</h2>
           <p>{error}</p>
@@ -69,6 +99,9 @@ export default function App() {
   if (!connected) {
     return (
       <div className="app">
+        <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === "light" ? "🌙" : "☀️"}
+        </button>
         <PreJoin onJoin={handleJoin} connecting={connecting} />
       </div>
     );
@@ -76,9 +109,14 @@ export default function App() {
 
   return (
     <div className="app">
+      <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+        {theme === "light" ? "🌙" : "☀️"}
+      </button>
       <ConversationView
         transcript={transcript}
         agentSpeaking={agentSpeaking}
+        preferences={preferences}
+        roomId={roomId}
         onRegisterEmail={handleRegisterEmail}
         onSendPlan={handleSendPlan}
         onCloseSession={handleCloseSession}

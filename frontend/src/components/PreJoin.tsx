@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import { SparklesFullPage } from "./ui/SparklesCore";
 
 interface PreJoinProps {
   onJoin: (roomName: string, identity: string) => void;
@@ -16,7 +17,7 @@ export default function PreJoin({ onJoin, connecting }: PreJoinProps) {
   };
 
   return (
-    <div className="prejoin">
+    <SparklesFullPage className="prejoin">
       <div className="prejoin-card">
         <h1>Advanced Care Planning</h1>
         <p className="prejoin-subtitle">
@@ -47,6 +48,6 @@ export default function PreJoin({ onJoin, connecting }: PreJoinProps) {
           permission to use them.
         </p>
       </div>
-    </div>
+    </SparklesFullPage>
   );
 }
