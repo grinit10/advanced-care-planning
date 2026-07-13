@@ -28,19 +28,48 @@ def create_llm() -> openai.LLM:
 
 
 def create_stt() -> deepgram.STT:
-    """Create a Deepgram STT instance with default config."""
+    """Create a Deepgram STT instance using the Australian endpoint.
+
+    Configures streaming STT with smart formatting, natural endpointing,
+    and filler words for more humane conversation transcripts.
+    All voice data stays in Australia (AWS ap-southeast-2, Sydney).
+    """
     return deepgram.STT(
         model="nova-3",
         language="en",
         api_key=DEEPGRAM_API_KEY,
+        base_url="https://api.au.deepgram.com/v1/listen",
+        # Smart formatting — numbers, dates, currency read naturally
+        smart_format=True,
+        # Keep filler words ("um", "uh") for natural transcripts
+        filler_words=True,
+        # Longer endpointing to avoid cutting users off mid-thought
+        endpointing_ms=500,
+        # Return interim results for live transcription
+        interim_results=True,
+        # Enable VAD events for better turn detection
+        vad_events=True,
+        # No delay — stream audio as it arrives
+        no_delay=True,
+        # Punctuate for readability
+        punctuate=True,
     )
 
 
 def create_tts() -> deepgram.TTS:
-    """Create a Deepgram TTS instance with default config."""
+    """Create a Deepgram TTS instance using the Australian endpoint.
+
+    Uses the Aura-2 model for more natural, expressive speech.
+    All voice data stays in Australia (AWS ap-southeast-2, Sydney).
+    """
     return deepgram.TTS(
         model="aura-asteria-en",
         api_key=DEEPGRAM_API_KEY,
+        base_url="https://api.au.deepgram.com/v1/speak",
+        # 24kHz sample rate for high-quality audio
+        sample_rate=24000,
+        # Linear16 encoding for wide compatibility
+        encoding="linear16",
     )
 
 

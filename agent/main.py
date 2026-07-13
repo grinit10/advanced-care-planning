@@ -20,6 +20,8 @@ from livekit.agents import (
     cli,
     llm,
 )
+from livekit.agents import tokenize
+from livekit.agents.tts import StreamAdapter
 from livekit.agents.voice import Agent, AgentSession
 
 from acp_agent import (
@@ -149,12 +151,42 @@ async def entrypoint(job: JobContext):
     )
 
     # Create the agent session (runtime that manages VAD → STT → LLM → TTS)
+    # Wrap TTS with a sentence tokenizer so it starts speaking sooner —
+    # instead of waiting for the full LLM response, it streams audio
+    # sentence-by-sentence for more natural pacing.
+    tts = StreamAdapter(
+        tts=create_tts(),
+        sentence_tokenizer=tokenize.basic.SentenceTokenizer(),
+    )
+
     session = AgentSession(
         vad=job.proc.userdata["vad"],
         stt=create_stt(),
         llm=create_llm(),
-        tts=create_tts(),
-        allow_interruptions=True,
+        tts=tts,
+        turn_handling={
+            # Enable interruptions — user can cut in at any time
+            "interruption": {
+                "enabled": True,
+                "mode": "vad",
+                "min_duration": 0.3,
+                "min_words": 2,
+            },
+            # Natural endpointing — waits for a pause, but doesn't
+            # hang forever if the user is thinking
+            "endpointing": {
+                "mode": "fixed",
+                "min_delay": 0.6,
+                "max_delay": 3.0,
+            },
+            # Preemptive generation — starts LLM inference before the
+            # user finishes speaking, so responses feel instant
+            "preemptive_generation": {
+                "enabled": True,
+                "preemptive_tts": False,
+                "max_speech_duration": 10.0,
+            },
+        },
     )
 
     # Start the session — this calls agent.on_enter() automatically
