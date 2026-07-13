@@ -1,0 +1,11 @@
+# Cloud K8s preset — production-ready defaults
+agent:
+  replicas: 3
+
+tokenServer:
+  replicas: 2
+
+frontend:
+  replicas: 3
+  ingress:
+    enabled: true

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "acp.fullname" . }}-livekit
+  labels: {{ include "acp.labels" . | nindent 4 }}
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/component: livekit
+  ports:
+    - name: webrtc-tcp
+      port: {{ .Values.livekit.port }}
+      targetPort: {{ .Values.livekit.port }}
+      protocol: TCP
+    - name: webrtc-udp
+      port: {{ .Values.livekit.udpPort }}
+      targetPort: {{ .Values.livekit.udpPort }}
+      protocol: UDP
+    - name: turn-udp
+      port: {{ .Values.livekit.turnPort }}
+      targetPort: {{ .Values.livekit.turnPort }}
+      protocol: UDP

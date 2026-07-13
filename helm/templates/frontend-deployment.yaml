@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "acp.fullname" . }}-frontend
+  labels: {{ include "acp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: frontend
+        {{ include "acp.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: frontend
+          image: {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          env:
+            - name: VITE_LIVEKIT_URL
+              value: "ws://{{ include "acp.fullname" . }}-livekit:7880"
+            - name: VITE_TOKEN_SERVER_URL
+              value: "http://{{ include "acp.fullname" . }}-token-server:{{ .Values.tokenServer.port }}"
+          resources: {{ toYaml .Values.frontend.resources | nindent 12 }}

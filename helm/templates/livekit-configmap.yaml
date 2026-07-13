@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "acp.fullname" . }}-livekit
+  labels: {{ include "acp.labels" . | nindent 4 }}
+data:
+  livekit.yaml: |
+    port: {{ .Values.livekit.port }}
+    bind_addresses:
+      - "0.0.0.0"
+    rtc:
+      use_external_ip: false
+    redis:
+      address: {{ include "acp.fullname" . }}-redis:6379
+    keys:
+      {{ .Values.livekit.apiKey }}: {{ .Values.livekit.apiSecret }}
+    logging:
+      level: info

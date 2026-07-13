@@ -1,0 +1,118 @@
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  imageRegistry: ""
+
+# =============================================================================
+# Azure OpenAI — REQUIRED
+# =============================================================================
+azure:
+  openai:
+    endpoint: ""
+    apiKey: ""
+    apiVersion: "2024-10-01-preview"
+    deployments:
+      llm: gpt-4.1-mini-aus
+
+# =============================================================================
+# Deepgram — Required for STT and TTS (Australian endpoint)
+# Get your API key at: https://console.deepgram.com
+# =============================================================================
+deepgram:
+  apiKey: ""
+
+# =============================================================================
+# LiveKit Server
+# =============================================================================
+livekit:
+  host: "0.0.0.0"
+  port: 7880
+  udpPort: 7881
+  turnPort: 7882
+  apiKey: "APIoSBh5JqSGNUC"
+  apiSecret: "Y4A9W5VgUcmedACbKKH49FXFzKuMVXqZofrc2B2q1R6"
+  image:
+    repository: livekit/livekit-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# =============================================================================
+# Redis
+# =============================================================================
+redis:
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# =============================================================================
+# Voice Agent
+# =============================================================================
+agent:
+  replicas: 1
+  image:
+    repository: acp-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# =============================================================================
+# Token Server
+# =============================================================================
+tokenServer:
+  replicas: 1
+  image:
+    repository: acp-token-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 8081
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# =============================================================================
+# Frontend
+# =============================================================================
+frontend:
+  replicas: 2
+  image:
+    repository: acp-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  ingress:
+    enabled: false
+    host: acp.example.com
+    className: ""
+    annotations: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

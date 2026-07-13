@@ -1,0 +1,13 @@
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+rtc:
+  use_external_ip: false
+redis:
+  address: redis:6379
+keys:
+  devkey: devsecret
+webhook:
+  api_key: devkey
+logging:
+  level: info

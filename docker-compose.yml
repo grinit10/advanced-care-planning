@@ -1,0 +1,74 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - acp-network
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    ports:
+      - "7880:7880"       # WebRTC (TCP)
+      - "7881:7881/udp"   # WebRTC (UDP)
+      - "7882:7882/udp"   # TURN (UDP)
+    volumes:
+      - ./livekit.yaml:/livekit.yaml
+    command: ["--config", "/livekit.yaml", "--node-ip", "${HOST_IP}", "--rtc.udp_port.start", "7881", "--rtc.udp_port.end", "7882"]
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - acp-network
+
+  agent:
+    build:
+      context: ./agent
+    ports:
+      - "8082:8082"       # HTTP API (session management)
+    env_file:
+      - .env
+    environment:
+      - LIVEKIT_URL=ws://livekit-server:7880
+      - RECORDINGS_DIR=/app/recordings
+    volumes:
+      - acp-recordings:/app/recordings
+    restart: unless-stopped
+    depends_on:
+      - livekit-server
+      - redis
+    networks:
+      - acp-network
+
+  token-server:
+    build:
+      context: ./token-server
+    ports:
+      - "8081:8081"
+    environment:
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=devsecret
+      - PORT=8081
+    restart: unless-stopped
+    depends_on:
+      - livekit-server
+    networks:
+      - acp-network
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+    depends_on:
+      - livekit-server
+      - token-server
+    networks:
+      - acp-network
+
+networks:
+  acp-network:
+    driver: bridge
+
+volumes:
+  acp-recordings:

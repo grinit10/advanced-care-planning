@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "acp.fullname" . }}-agent
+  labels: {{ include "acp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.agent.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: agent
+        {{ include "acp.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: agent
+          image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "acp.fullname" . }}-agent
+          env:
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acp.fullname" . }}-azure-key
+                  key: apiKey
+            - name: LIVEKIT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acp.fullname" . }}-livekit-key
+                  key: apiKey
+            - name: LIVEKIT_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acp.fullname" . }}-livekit-key
+                  key: apiSecret
+            - name: DEEPGRAM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acp.fullname" . }}-deepgram-key
+                  key: apiKey
+          resources: {{ toYaml .Values.agent.resources | nindent 12 }}

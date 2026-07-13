@@ -1,0 +1,10 @@
+# Local/minikube preset — overrides values.yaml for local K8s
+frontend:
+  ingress:
+    enabled: false
+
+tokenServer:
+  replicas: 1
+
+agent:
+  replicas: 1
