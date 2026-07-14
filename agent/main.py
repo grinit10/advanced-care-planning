@@ -229,18 +229,20 @@ async def entrypoint(job: JobContext):
                 "min_duration": 0.3,
                 "min_words": 2,
             },
-            # Natural endpointing — waits for a pause, but doesn't
-            # hang forever if the user is thinking
+            # Hypothesis endpointing — uses STT interim results to detect
+            # sentence completion faster than waiting for silence
             "endpointing": {
-                "mode": "fixed",
-                "min_delay": 0.6,
-                "max_delay": 3.0,
+                "mode": "hypothesis",
+                "min_delay": 0.4,
+                "max_delay": 1.5,
             },
-            # Preemptive generation — starts LLM inference before the
-            # user finishes speaking, so responses feel instant
+            # Preemptive generation + TTS — starts LLM inference before
+            # the user finishes speaking, AND streams TTS audio from
+            # partial LLM output so the user hears the first sound
+            # ~800ms sooner.
             "preemptive_generation": {
                 "enabled": True,
-                "preemptive_tts": False,
+                "preemptive_tts": True,
                 "max_speech_duration": 10.0,
             },
         },

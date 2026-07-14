@@ -28,7 +28,7 @@ def create_llm() -> openai.LLM:
         api_key=AZURE_API_KEY,
         model=AZURE_LLM_DEPLOYMENT,
         extra_query={"api-version": AZURE_API_VERSION},
-        temperature=0.85,
+        temperature=0.7,
     )
 
 
@@ -48,8 +48,8 @@ def create_stt() -> deepgram.STT:
         smart_format=True,
         # Keep filler words ("um", "uh") for natural transcripts
         filler_words=True,
-        # Longer endpointing to avoid cutting users off mid-thought
-        endpointing_ms=500,
+        # Shorter endpointing for faster turn detection — 300ms
+        endpointing_ms=300,
         # Return interim results for live transcription
         interim_results=True,
         # Enable VAD events for better turn detection
