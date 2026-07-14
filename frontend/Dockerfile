@@ -1,5 +1,5 @@
 # ---- Build Stage ----
-FROM node:23-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -14,8 +14,10 @@ FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Forward VITE_* env vars to the nginx-served app at runtime
-# The nginx entrypoint script handles this for VITE_ prefixed vars
+# NOTE: VITE_* environment variables are baked into the JS bundle at build time.
+# To change API URLs for different environments, rebuild the image with
+# different VITE_* values, or use a runtime config injection strategy.
+# See: https://vite.dev/guide/env-and-mode
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

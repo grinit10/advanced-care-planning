@@ -1,0 +1,32 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Tests (not needed at runtime)
+tests/
+src/__tests__/

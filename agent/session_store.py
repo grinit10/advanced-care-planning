@@ -36,19 +36,6 @@ class TranscriptEntry:
     timestamp: float = field(default_factory=time.time)
 
 
-@dataclass
-class SessionData:
-    room_id: str
-    status: str = "active"            # active | closed
-    transcript: list[dict] = field(default_factory=list)
-    preferences: dict = field(default_factory=dict)
-    emails: set = field(default_factory=set)
-    audio_path: Optional[str] = None
-    plan_summary: Optional[str] = None
-    created_at: float = field(default_factory=time.time)
-    participant_identity: str = ""
-
-
 class SessionStore:
     """Redis-backed session store. One instance per agent process."""
 
@@ -113,18 +100,10 @@ class SessionStore:
         raw = await self._redis.hgetall(self._key(room_id, "preferences"))
         return raw or {}
 
-    async def set_preferences_bulk(self, room_id: str, prefs: dict):
-        """Set multiple flat preference key-value pairs."""
-        if prefs:
-            await self._redis.hset(
-                self._key(room_id, "preferences"), mapping=prefs
-            )
-
     async def get_preferences_json(self, room_id: str) -> dict:
         """Get the full nested preferences JSON object."""
         raw = await self._redis.get(self._key(room_id, "preferences_json"))
         if raw:
-            import json
             try:
                 return json.loads(raw)
             except (json.JSONDecodeError, TypeError):
@@ -133,7 +112,6 @@ class SessionStore:
 
     async def save_preferences_json(self, room_id: str, prefs: dict):
         """Save the full nested preferences JSON object (replaces entirely)."""
-        import json
         await self._redis.set(
             self._key(room_id, "preferences_json"),
             json.dumps(prefs, default=str),

@@ -1,0 +1,47 @@
+# Ruff configuration for the ACP agent Python codebase.
+# See https://docs.astral.sh/ruff/configuration/ for details.
+
+target-version = "py312"
+
+# Enable pycodestyle (E), pyflakes (F), isort (I), and more.
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "S",   # flake8-bandit (security)
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
+]
+
+# Ignore line-length in docstrings and comments
+ignore = [
+    "E501",  # line too long — let the formatter handle it
+    "S101",  # assert allowed (we use it in tests)
+]
+
+# Allow auto-fix for some rules
+fixable = ["I", "UP", "F", "E", "W"]
+
+# Exclude generated files
+exclude = [
+    ".git",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "dist",
+    "build",
+]
+
+# Enable format
+format = true
+
+[per-file-ignores]
+"__init__.py" = ["F401"]  # allow unused imports in __init__.py
+"tests/**" = ["S101"]     # allow assert in tests
+
+[mccabe]
+max-complexity = 12

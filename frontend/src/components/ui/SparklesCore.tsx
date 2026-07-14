@@ -1,5 +1,3 @@
-"use client";
-
 import { loadSlim } from "@tsparticles/slim";
 import { Particles, ParticlesProvider } from "@tsparticles/react";
 import type { ISourceOptions } from "@tsparticles/engine";

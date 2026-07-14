@@ -20,6 +20,9 @@ from typing import Optional
 
 from aiohttp import web
 
+from email_sender import is_configured as email_configured, send_plan_email
+from session_store import SessionStore
+
 # CORS headers — allow the frontend dev server to call this API
 _CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -37,10 +40,6 @@ async def cors_middleware(request: web.Request, handler):
     for key, val in _CORS_HEADERS.items():
         resp.headers[key] = val
     return resp
-
-
-from email_sender import is_configured as email_configured, send_plan_email
-from session_store import SessionStore
 
 logger = logging.getLogger("acp-agent.http")
 

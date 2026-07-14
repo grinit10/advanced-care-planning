@@ -421,19 +421,19 @@ kubectl get svc
 ## 🏗 Architecture
 
 ```
-┌──────────────┐     WebRTC     ┌────────────────────┐     Azure OpenAI API     ┌──────────────┐
-│   Frontend   │◄──────────────►│  LiveKit Server    │◄────────────────────────►│   Azure      │
-│  (React/TS)  │                │   (Docker Local)   │                          │   OpenAI     │
-│              │                │                    │                          │ (LLM/STT/TTS)│
-└──────────────┘                └────────┬───────────┘                          └──────────────┘
-                                         │
-                                         │ Agent Dispatch (Redis)
-                                         │
-                                 ┌───────▼────────┐
-                                 │  Voice Agent   │
-                                 │   (Python)     │
-                                 │ VAD→STT→LLM→TTS│
-                                 └────────────────┘
+┌──────────────┐     WebRTC     ┌────────────────────┐     Deepgram API      ┌──────────────┐
+│   Frontend   │◄──────────────►│  LiveKit Server    │◄─────────────────────►│   Deepgram   │
+│  (React/TS)  │                │   (Docker Local)   │  (api.au.deepgram.com)│  STT + TTS   │
+│              │                │                    │  AWS Sydney           │  (Nova-3,    │
+└──────────────┘                └────────┬───────────┘  ap-southeast-2       │  Aura-2)     │
+                                         │                                   └──────────────┘
+                                         │ Agent Dispatch (Redis)              Azure OpenAI
+                                         │                                   ┌──────────────┐
+                                 ┌───────▼────────┐                          │   Azure      │
+                                 │  Voice Agent   │◄────────────────────────►│   OpenAI     │
+                                 │   (Python)     │  Azure OpenAI API         │  (LLM)       │
+                                 │ VAD→STT→LLM→TTS│  Australia East           │  gpt-4.1-mini│
+                                 └────────────────┘                          └──────────────┘
 ```
 
 ### Components
@@ -446,15 +446,15 @@ kubectl get svc
 | **Voice Agent** | AI pipeline: VAD → STT → LLM → TTS | Python (LiveKit Agents) |
 | **Token Server** | Generates LiveKit access tokens | Python (aiohttp) |
 | **Azure OpenAI** | LLM (conversation brain) | Cloud API (Australia East) |
-| **Deepgram** | STT (Nova-3) + TTS (Aura) via Australian endpoint | Cloud API (AWS Sydney) |
+| **Deepgram** | STT (Nova-3) + TTS (Aura-2) via Australian endpoint | Cloud API (AWS Sydney) |
 
 ### Data Flow (One Conversation Turn)
 
 1. User speaks → browser mic → WebRTC audio → **LiveKit Server**
 2. Agent receives audio → **Silero VAD** detects speech boundaries
 3. Audio segments → **Deepgram STT** (Nova-3, via `api.au.deepgram.com`) → text transcript
-4. Transcript → **Azure OpenAI LLM** (with ACP prompt) → response text
-5. Response text → **Deepgram TTS** (Aura, via `api.au.deepgram.com`) → synthesised audio stream
+4. Transcript → **Azure OpenAI LLM** (GPT-4.1-mini-aus, with ACP prompt) → response text
+5. Response text → **Deepgram TTS** (Aura-2, via `api.au.deepgram.com`) → synthesised audio stream
 6. Audio → LiveKit Server → WebRTC → user hears response
 
 ### Data Residency
@@ -474,7 +474,7 @@ kubectl get svc
 | `AZURE_OPENAI_ENDPOINT` | ✅ | — | Your Azure OpenAI endpoint URL |
 | `AZURE_OPENAI_API_KEY` | ✅ | — | Your Azure OpenAI API key |
 | `AZURE_OPENAI_API_VERSION` | ✅ | `2024-10-01-preview` | API version |
-| `AZURE_OPENAI_LLM_DEPLOYMENT` | ✅ | `gpt-4o-mini` | LLM deployment name |
+| `AZURE_OPENAI_LLM_DEPLOYMENT` | ✅ | `gpt-4.1-mini-aus` | LLM deployment name |
 | `DEEPGRAM_API_KEY` | ✅ | — | Deepgram API key (for STT & TTS via Australian endpoint) |
 | `LIVEKIT_API_KEY` | — | `devkey` | LiveKit API key (local default) |
 | `LIVEKIT_API_SECRET` | — | `devsecret` | LiveKit API secret (local default) |
@@ -486,7 +486,7 @@ kubectl get svc
 | `azure.openai.endpoint` | `""` | Azure OpenAI endpoint (required) |
 | `azure.openai.apiKey` | `""` | Azure OpenAI API key (required) |
 | `azure.openai.apiVersion` | `2024-10-01-preview` | API version |
-| `azure.openai.deployments.llm` | `gpt-4o-mini` | LLM deployment name |
+| `azure.openai.deployments.llm` | `gpt-4.1-mini-aus` | LLM deployment name |
 | `deepgram.apiKey` | `""` | Deepgram API key (required for STT & TTS) |
 | `livekit.apiKey` | `devkey` | LiveKit API key |
 | `livekit.apiSecret` | `devsecret` | LiveKit API secret |
