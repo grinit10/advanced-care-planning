@@ -123,7 +123,7 @@ export default function ConversationView({
           <div className="plan-section">
             <h3>3. Download your data</h3>
             <p className="text-muted">
-              Download your conversation transcript and audio recording before closing.
+              Download your conversation transcript before closing.
             </p>
             <div className="download-row">
               <a
@@ -132,13 +132,6 @@ export default function ConversationView({
                 download
               >
                 Download Transcript
-              </a>
-              <a
-                className="btn-download"
-                href={`${AGENT_API_URL}/recording/${encodeURIComponent(roomId)}`}
-                download
-              >
-                Download Recording
               </a>
             </div>
           </div>
