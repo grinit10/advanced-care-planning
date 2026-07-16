@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 from prompt_loader import TTS_FORMATTING_RULES, load_prompt
 
 
@@ -14,9 +15,9 @@ def test_load_prompt_from_yaml(sample_prompt_yaml: Path):
     assert "---" in result  # separator between user prompt and TTS rules
 
 
-def test_load_prompt_missing_file():
+def test_load_prompt_missing_file(tmp_path: Path):
     """Test fallback to built-in prompt when prompt.yaml is missing."""
-    result = load_prompt("/tmp/nonexistent_prompt.yaml")
+    result = load_prompt(str(tmp_path / "nonexistent_prompt.yaml"))
     assert "You are a compassionate Advanced Care Planning" in result
     assert TTS_FORMATTING_RULES.strip() in result
 
@@ -58,5 +59,6 @@ def test_load_prompt_with_invalid_yaml(tmp_path: Path):
     """Test that invalid YAML raises an error."""
     yaml_path = tmp_path / "prompt.yaml"
     yaml_path.write_text(": : invalid yaml : :\n")
-    with pytest.raises(Exception):
+    with pytest.raises(yaml.YAMLError):
         load_prompt(str(yaml_path))
+

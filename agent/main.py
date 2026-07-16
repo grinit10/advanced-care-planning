@@ -12,11 +12,12 @@ import threading
 from pathlib import Path
 
 from acp_agent import (
+    create_extractor_llm,
     create_initial_context,
-    create_llm,
     create_stt,
     create_tts,
     create_vad,
+    create_voice_llm,
 )
 from audio_recorder import ConversationRecorder
 from dotenv import load_dotenv
@@ -217,14 +218,15 @@ async def entrypoint(job: JobContext):
     await recorder.start()
     _active_recorders[room_id] = recorder
 
-    # Create the LLM instance (shared by conversation and preference extraction)
-    llm_instance = create_llm()
+    # Create the LLM instances (separate for voice conversation and preference extraction)
+    voice_llm_instance = create_voice_llm()
+    extractor_llm_instance = create_extractor_llm()
 
     # Create the agent instance (captures conversation logic)
     agent = ACPAgent(
         chat_ctx=create_initial_context(),
         room_id=room_id,
-        llm_instance=llm_instance,
+        llm_instance=extractor_llm_instance,
     )
 
     # Create the agent session (runtime that manages VAD → STT → LLM → TTS)
@@ -239,7 +241,7 @@ async def entrypoint(job: JobContext):
     session = AgentSession(
         vad=job.proc.userdata["vad"],
         stt=create_stt(),
-        llm=llm_instance,
+        llm=voice_llm_instance,
         tts=tts,
         turn_handling={
             # Enable interruptions — user can cut in at any time
@@ -254,8 +256,8 @@ async def entrypoint(job: JobContext):
             # original 0.6/3.0 for faster turn-taking.
             "endpointing": {
                 "mode": "fixed",
-                "min_delay": 0.4,
-                "max_delay": 1.5,
+                "min_delay": 0.3,
+                "max_delay": 1.0,
             },
             # Preemptive generation + TTS — starts LLM inference before
             # the user finishes speaking, AND streams TTS audio from

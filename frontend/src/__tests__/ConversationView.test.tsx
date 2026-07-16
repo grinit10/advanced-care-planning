@@ -35,4 +35,19 @@ describe("ConversationView", () => {
       "_blank",
     );
   });
+
+  it("calls window.open with correct plan docx URL when clicking download plan", async () => {
+    render(<ConversationView {...defaultProps} />);
+
+    const downloadLink = screen.getByText("Download Plan (.docx)");
+    expect(downloadLink).toBeInTheDocument();
+
+    // Trigger click
+    fireEvent.click(downloadLink);
+
+    expect(window.open).toHaveBeenCalledWith(
+      "http://localhost:8082/plan-docx/test-room",
+      "_blank",
+    );
+  });
 });

@@ -2,7 +2,7 @@ import os
 
 from acp_prompts import get_system_prompt
 from livekit.agents import ChatContext, ChatMessage
-from livekit.plugins import deepgram, openai, silero
+from livekit.plugins import deepgram, groq, openai, silero
 
 # =============================================================================
 # Credentials loaded from .env (via load_dotenv in main.py)
@@ -11,23 +11,36 @@ AZURE_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
 AZURE_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")
 AZURE_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
 AZURE_LLM_DEPLOYMENT = os.environ.get("AZURE_OPENAI_LLM_DEPLOYMENT", "")
+AZURE_EXTRACTOR_LLM_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT") or AZURE_LLM_DEPLOYMENT
+
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_VOICE_MODEL = os.environ.get("GROQ_VOICE_MODEL", "llama-3.1-8b-instant")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 
 
-def create_llm() -> openai.LLM:
-    """Create an Azure OpenAI LLM instance.
 
-    Uses a slightly elevated temperature (0.7) for more varied,
-    natural-sounding speech rather than robotic repetition.
-    """
-    return openai.LLM(
-        base_url=f"{AZURE_ENDPOINT}/openai/deployments/{AZURE_LLM_DEPLOYMENT}",
-        api_key=AZURE_API_KEY,
-        model=AZURE_LLM_DEPLOYMENT,
-        extra_query={"api-version": AZURE_API_VERSION},
+def create_voice_llm() -> groq.LLM:
+    """Create an LLM instance for voice conversation using Groq (optimized for low-latency LPU inference)."""
+    if not GROQ_API_KEY:
+        raise ValueError("GROQ_API_KEY is not configured in .env. Groq is required for the voice model.")
+    return groq.LLM(
+        api_key=GROQ_API_KEY,
+        model=GROQ_VOICE_MODEL,
         temperature=0.7,
     )
+
+
+def create_extractor_llm() -> openai.LLM:
+    """Create an Azure OpenAI LLM instance for preference extraction (optimized for accuracy)."""
+    return openai.LLM(
+        base_url=f"{AZURE_ENDPOINT}/openai/deployments/{AZURE_EXTRACTOR_LLM_DEPLOYMENT}",
+        api_key=AZURE_API_KEY,
+        model=AZURE_EXTRACTOR_LLM_DEPLOYMENT,
+        extra_query={"api-version": AZURE_API_VERSION},
+        temperature=0.0,
+    )
+
 
 
 def create_stt() -> deepgram.STT:
@@ -46,8 +59,8 @@ def create_stt() -> deepgram.STT:
         smart_format=True,
         # Keep filler words ("um", "uh") for natural transcripts
         filler_words=True,
-        # Shorter endpointing for faster turn detection — 300ms
-        endpointing_ms=300,
+        # Shorter endpointing for faster turn detection — 200ms
+        endpointing_ms=200,
         # Return interim results for live transcription
         interim_results=True,
         # Enable VAD events for better turn detection

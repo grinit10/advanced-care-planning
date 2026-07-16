@@ -15,11 +15,15 @@ Endpoints:
 
 import asyncio
 import hashlib
+import io
 import json
 import logging
 import os
 
+import docx
 from aiohttp import web
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Pt, RGBColor
 from email_sender import is_configured as email_configured
 from email_sender import send_plan_email
 from session_store import SessionStore
@@ -329,6 +333,167 @@ async def handle_get_transcript_download(request: web.Request) -> web.Response:
     )
 
 
+async def handle_get_plan_docx(request: web.Request) -> web.Response:
+    """Generate and return the ACP plan as a formatted Word Document (.docx)."""
+    room_id = request.match_info["room_id"]
+    store = await _get_store()
+
+    transcript = await store.get_transcript(room_id)
+    preferences = await store.get_preferences_json(room_id)
+    summary = await store.get_plan_summary(room_id)
+
+    if not summary:
+        summary = await _generate_summary(room_id)
+        await store.set_plan_summary(room_id, summary)
+
+    doc = docx.Document()
+
+    # Title
+    title = doc.add_paragraph()
+    title_run = title.add_run("Advanced Care Planning Summary")
+    title_run.font.name = "Arial"
+    title_run.font.size = Pt(22)
+    title_run.font.bold = True
+    title_run.font.color.rgb = RGBColor(44, 95, 124) # #2c5f7c
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Overview
+    h = doc.add_paragraph()
+    hrun = h.add_run("Plan Overview")
+    hrun.font.name = "Arial"
+    hrun.font.size = Pt(14)
+    hrun.font.bold = True
+    hrun.font.color.rgb = RGBColor(51, 51, 51)
+
+    doc.add_paragraph(summary)
+
+    # Preferences
+    h = doc.add_paragraph()
+    hrun = h.add_run("Your Preferences")
+    hrun.font.name = "Arial"
+    hrun.font.size = Pt(14)
+    hrun.font.bold = True
+    hrun.font.color.rgb = RGBColor(51, 51, 51)
+
+    sections = [
+        ("substitute_decision_maker", "Substitute Decision-Maker", [("name", "Who"), ("relationship", "Relationship")]),
+        ("quality_of_life", "Quality of Life", [("values", "What matters"), ("fears", "Concerns")]),
+        ("treatment_preferences", "Treatment Preferences", [("life_support", "Life support"), ("cpr", "CPR"), ("feeding_tubes", "Feeding tubes"), ("pain_management", "Pain management")]),
+        ("personal_beliefs", "Values & Beliefs", [("faith_role", "Faith/Spirituality"), ("cultural_values", "Cultural values")]),
+        ("specific_scenarios", "Specific Scenarios", [("dementia", "Dementia"), ("coma", "Coma"), ("terminal_illness", "Terminal illness")]),
+        ("dignity_and_values", "Dignity & Values", [("meaning_of_life", "What gives life meaning"), ("dignity_definition", "Definition of dignity")]),
+    ]
+
+    table = doc.add_table(rows=1, cols=2)
+    table.style = 'Light Shading Accent 1'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Preference Category'
+    hdr_cells[1].text = 'Recorded Preference'
+    for cell in hdr_cells:
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                run.font.bold = True
+                run.font.name = "Arial"
+
+    for sec_key, sec_label, fields in sections:
+        sec_data = preferences.get(sec_key, {})
+        if not sec_data or not sec_data.get("discussed"):
+            row_cells = table.add_row().cells
+            row_cells[0].text = sec_label
+            row_cells[1].text = "Not yet discussed"
+            for cell in row_cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.name = "Arial"
+            continue
+
+        row_cells = table.add_row().cells
+        row_cells[0].text = sec_label
+        row_cells[0].paragraphs[0].runs[0].font.bold = True
+        row_cells[1].text = ""
+        for cell in row_cells:
+            for paragraph in cell.paragraphs:
+                for run in paragraph.runs:
+                    run.font.name = "Arial"
+
+        for f_key, f_label in fields:
+            raw_val = sec_data.get(f_key)
+            if raw_val is not None and raw_val != "":
+                val_str = _pref_value(raw_val)
+                if val_str.strip():
+                    row_cells = table.add_row().cells
+                    row_cells[0].text = f"  • {f_label}"
+                    row_cells[1].text = val_str
+                    for cell in row_cells:
+                        for paragraph in cell.paragraphs:
+                            for run in paragraph.runs:
+                                run.font.name = "Arial"
+
+        notes = sec_data.get("notes")
+        if notes:
+            val_str = _pref_value(notes)
+            if val_str.strip():
+                row_cells = table.add_row().cells
+                row_cells[0].text = "  • Notes"
+                row_cells[1].text = val_str
+                for cell in row_cells:
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.name = "Arial"
+
+    # Transcript
+    h = doc.add_paragraph()
+    doc.add_paragraph()
+    hrun = h.add_run("Conversation Transcript")
+    hrun.font.name = "Arial"
+    hrun.font.size = Pt(14)
+    hrun.font.bold = True
+    hrun.font.color.rgb = RGBColor(51, 51, 51)
+
+    if transcript:
+        for entry in transcript:
+            p = doc.add_paragraph()
+            role_label = "You" if entry.get("role") == "user" else "Assistant"
+            text = entry.get("text", "")
+            role_run = p.add_run(f"{role_label}: ")
+            role_run.font.name = "Arial"
+            role_run.bold = True
+            text_run = p.add_run(text)
+            text_run.font.name = "Arial"
+    else:
+        p = doc.add_paragraph("No transcript available.")
+        p.runs[0].font.name = "Arial"
+
+    # Footer Disclaimer
+    doc.add_paragraph()
+    p = doc.add_paragraph()
+    p_run = p.add_run("Next Steps: Share these wishes with your substitute decision-maker, family, and GP. Formalise your Advance Care Directive through your state or territory's health department.")
+    p_run.font.name = "Arial"
+    p_run.font.size = Pt(10)
+    p_run.font.italic = True
+
+    p2 = doc.add_paragraph()
+    p2_run = p2.add_run("This summary was generated by an AI assistant and should be reviewed by you and your healthcare provider before being formalised. It is not a legal document.")
+    p2_run.font.name = "Arial"
+    p2_run.font.size = Pt(9)
+    p2_run.font.italic = True
+    p2_run.font.color.rgb = RGBColor(128, 128, 128)
+
+    # Save to BytesIO
+    bio = io.BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+
+    filename = f"acp-plan-{room_id}.docx"
+    return web.Response(
+        body=bio.read(),
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    )
+
+
 async def handle_get_transcript_json(request: web.Request) -> web.Response:
     """Return the transcript as JSON for live polling."""
     room_id = request.match_info["room_id"]
@@ -527,6 +692,7 @@ def create_app() -> web.Application:
     app.router.add_get("/plan/{room_id}", handle_get_plan)
     app.router.add_get("/recording/{room_id}", handle_get_recording)
     app.router.add_get("/transcript/{room_id}", handle_get_transcript_download)
+    app.router.add_get("/plan-docx/{room_id}", handle_get_plan_docx)
     app.router.add_get("/transcript-json/{room_id}", handle_get_transcript_json)
     app.router.add_post("/email/{room_id}", handle_add_email)
     app.router.add_post("/send-plan/{room_id}", handle_send_plan)

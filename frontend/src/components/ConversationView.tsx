@@ -72,6 +72,11 @@ export default function ConversationView({
     window.open(`${AGENT_API_URL}/transcript/${encodeURIComponent(roomId)}`, "_blank");
   };
 
+  const handleDownloadPlan = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    window.open(`${AGENT_API_URL}/plan-docx/${encodeURIComponent(roomId)}`, "_blank");
+  };
+
   if (mode === "plan" || !connected) {
     return (
       <div className="conversation-container">
@@ -147,6 +152,9 @@ export default function ConversationView({
             <div className="download-row">
               <a className="btn-download" href="#" onClick={handleDownloadTranscript}>
                 Download Transcript
+              </a>
+              <a className="btn-download" href="#" onClick={handleDownloadPlan}>
+                Download Plan (.docx)
               </a>
             </div>
           </div>

@@ -5,6 +5,7 @@ from LiveKit room audio tracks and saves them as a single WAV file.
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import time
@@ -94,17 +95,13 @@ class ConversationRecorder:
         """Stop recording."""
         self._recording = False
         for stream in self._all_streams:
-            try:
+            with contextlib.suppress(Exception):
                 stream.close()
-            except Exception:
-                pass
         self._all_streams.clear()
         if self._read_task:
             self._read_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._read_task
-            except asyncio.CancelledError:
-                pass
             self._read_task = None
         logger.info(
             "Stopped recording. Captured %d audio frames",

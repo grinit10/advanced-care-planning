@@ -1,8 +1,8 @@
 # 🏥 Advanced Care Planning — Voice AI Assistant
 
 > **Have a conversation with AI about your future healthcare wishes.**
-> Runs locally via Docker — your conversation data is processed by Azure OpenAI (Australia East)
-> and Deepgram (AWS Sydney) in real-time and is **not stored** by either service.
+> Runs locally via Docker — your conversation data is processed by Groq LPU (Sydney, Australia) for fast voice responses, Azure OpenAI (Australia East) for background preference extraction,
+> and Deepgram (AWS Sydney) in real-time, and is **not stored** by either service.
 > Designed with the Australian healthcare context in mind.
 
 ---
@@ -77,10 +77,10 @@ You need an Azure OpenAI resource with 3 models deployed. Follow these steps:
 
    | Model | Deployment Name | Purpose |
    |-------|----------------|---------|
-   | **gpt-4.1-mini-aus** | `gpt-4.1-mini-aus` | The brain (conversation) |
+   | **gpt-4.1-mini-aus** | `gpt-4.1-mini-aus` | Background preference extraction & summaries |
 
-   > **STT & TTS are handled by Deepgram (not Azure OpenAI).**
-   > See [Step 2d](#setup-deepgram-for-stt-and-tts) below.
+   > **The live voice conversation is handled by Groq for low latency, while STT & TTS are handled by Deepgram.**
+   > See [Step 2d](#setup-deepgram-for-stt-and-tts) and [Step 2e](#setup-groq-for-low-latency-voice) below.
 
    For each model:
    - Select the model from the dropdown
@@ -108,6 +108,15 @@ Speech-to-text and text-to-speech are handled by **Deepgram**, not Azure OpenAI.
 3. Click **"Create a new API Key"**, give it a name (e.g. `acp-agent`), and copy the key
 4. You'll add this key to your `.env` file in the next step
 
+### Step 2e: Set Up Groq for Low-Latency Voice
+
+The live voice conversation uses **Groq** for LPU inference, hosted in Sydney for low latency.
+
+1. Go to https://console.groq.com and sign up
+2. Go to **"API Keys"** in the left menu
+3. Click **"Create API Key"**, copy it, and keep it safe
+4. You can configure ZDR (Zero Data Retention) in your Groq Console under data controls for privacy.
+
 ### Step 3: Download and Configure the Project
 
 #### Option A: Download ZIP
@@ -133,6 +142,9 @@ AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
 AZURE_OPENAI_API_KEY=your-api-key-here
 AZURE_OPENAI_API_VERSION=2024-10-01-preview
 AZURE_OPENAI_LLM_DEPLOYMENT=gpt-4.1-mini-aus
+AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT=gpt-5.4-mini-aus
+GROQ_API_KEY=your-groq-api-key-here
+GROQ_VOICE_MODEL=llama-3.1-8b-instant
 DEEPGRAM_API_KEY=your-deepgram-api-key-here
 LIVEKIT_API_KEY=devkey
 LIVEKIT_API_SECRET=devsecret
@@ -228,12 +240,12 @@ docker compose up -d
 3. The **Voice Agent** receives the audio:
    - **VAD** (Voice Activity Detection) finds where your speech starts and ends
    - **Deepgram STT** (Nova-3, via `api.au.deepgram.com`) converts your speech to text
-   - **Azure OpenAI LLM** generates a thoughtful response about ACP
+   - **Groq LLM** (via Sydney LPU cluster) generates a thoughtful response about ACP
    - **Deepgram TTS** (Aura, via `api.au.deepgram.com`) converts the response text to natural-sounding speech
 4. You hear the AI's response through your speakers
 5. The conversation transcript appears on the screen
 
-**Your data flows: Browser → LiveKit → Agent → Deepgram (STT) → Azure OpenAI (LLM) → Deepgram (TTS) → Agent → LiveKit → Browser**
+**Your data flows: Browser → LiveKit → Agent → Deepgram (STT) → Groq (Voice LLM) → Deepgram (TTS) → Agent → LiveKit → Browser (with Azure OpenAI extracting preferences in the background)**
 **Audio and text transit through cloud services in real-time but are not stored by them.**
 
 ---
@@ -296,7 +308,8 @@ This is the recommended way to run the project. It starts all components with a 
 ### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Azure OpenAI](https://portal.azure.com) resource in **Australia East** with an LLM model deployed (e.g. gpt-4o-mini)
+- A [Groq Cloud](https://console.groq.com) API key for fast voice responses (Sydney LPU cluster)
+- An [Azure OpenAI](https://portal.azure.com) resource in **Australia East** with an LLM model deployed (e.g. gpt-4.1-mini-aus) for background preference extraction
 - A [Deepgram](https://console.deepgram.com) API key (Australian endpoint — data stays in Sydney)
 - A microphone
 
@@ -430,15 +443,21 @@ kubectl get svc
 │   Frontend   │◄──────────────►│  LiveKit Server    │◄─────────────────────►│   Deepgram   │
 │  (React/TS)  │                │   (Docker Local)   │  (api.au.deepgram.com)│  STT + TTS   │
 │              │                │                    │  AWS Sydney           │  (Nova-3,    │
-└──────────────┘                └────────┬───────────┘  ap-southeast-2       │  Aura-2)     │
-                                         │                                   └──────────────┘
-                                         │ Agent Dispatch (Redis)              Azure OpenAI
+│              │                │                    │  ap-southeast-2       │  Aura-2)     │
+└──────────────┘                └────────┬───────────┘                       └──────────────┘
+                                         │
+                                         │ Agent Dispatch (Redis)              Groq LPU (Sydney)
                                          │                                   ┌──────────────┐
-                                 ┌───────▼────────┐                          │   Azure      │
-                                 │  Voice Agent   │◄────────────────────────►│   OpenAI     │
-                                 │   (Python)     │  Azure OpenAI API         │  (LLM)       │
-                                 │ VAD→STT→LLM→TTS│  Australia East           │  gpt-4.1-mini│
-                                 └────────────────┘                          └──────────────┘
+                                 ┌───────▼────────┐                          │     Groq     │
+                                 │  Voice Agent   │◄────────────────────────►│  (Voice LLM) │
+                                 │   (Python)     │  Groq API                │  llama-3.1   │
+                                 │ VAD→STT→LLM→TTS│                          └──────────────┘
+                                 └───────┬────────┘                            Azure OpenAI
+                                         │                                   ┌──────────────┐
+                                         │ Extracted Preferences             │    Azure     │
+                                         └──────────────────────────────────►│    OpenAI     │
+                                                                             │ (Extractor)  │
+                                                                             └──────────────┘
 ```
 
 ### Components
@@ -450,7 +469,8 @@ kubectl get svc
 | **Redis** | Agent dispatch queue | Redis 7 |
 | **Voice Agent** | AI pipeline: VAD → STT → LLM → TTS | Python (LiveKit Agents) |
 | **Token Server** | Generates LiveKit access tokens | Python (aiohttp) |
-| **Azure OpenAI** | LLM (conversation brain) | Cloud API (Australia East) |
+| **Groq** | LLM (voice conversation brain) | Cloud API (Sydney LPU cluster) |
+| **Azure OpenAI** | LLM (preference extraction & summary generation) | Cloud API (Australia East) |
 | **Deepgram** | STT (Nova-3) + TTS (Aura-2) via Australian endpoint | Cloud API (AWS Sydney) |
 
 ### Data Flow (One Conversation Turn)
@@ -479,7 +499,10 @@ kubectl get svc
 | `AZURE_OPENAI_ENDPOINT` | ✅ | — | Your Azure OpenAI endpoint URL |
 | `AZURE_OPENAI_API_KEY` | ✅ | — | Your Azure OpenAI API key |
 | `AZURE_OPENAI_API_VERSION` | ✅ | `2024-10-01-preview` | API version |
-| `AZURE_OPENAI_LLM_DEPLOYMENT` | ✅ | `gpt-4.1-mini-aus` | LLM deployment name |
+| `AZURE_OPENAI_LLM_DEPLOYMENT` | ✅ | `gpt-4.1-mini-aus` | Default LLM deployment name |
+| `AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT` | — | `gpt-5.4-mini-aus` | Extractor LLM deployment name (optional) |
+| `GROQ_API_KEY` | ✅ | — | Groq Cloud API key (for low-latency voice model) |
+| `GROQ_VOICE_MODEL` | — | `llama-3.1-8b-instant` | Groq voice conversation model |
 | `DEEPGRAM_API_KEY` | ✅ | — | Deepgram API key (for STT & TTS via Australian endpoint) |
 | `LIVEKIT_API_KEY` | — | `devkey` | LiveKit API key (local default) |
 | `LIVEKIT_API_SECRET` | — | `devsecret` | LiveKit API secret (local default) |
