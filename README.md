@@ -1,14 +1,15 @@
 # 🏥 Advanced Care Planning — Voice AI Assistant
 
 > **Have a conversation with AI about your future healthcare wishes.**
-> Everything runs on your computer — your voice data never leaves your home.
+> Runs locally via Docker — your conversation data is processed by Azure OpenAI (Australia East)
+> and Deepgram (AWS Sydney) in real-time and is **not stored** by either service.
 > Designed with the Australian healthcare context in mind.
 
 ---
 
 ## 📋 Table of Contents
 
-- [Quick Start (10 minutes)](#-quick-start-10-minutes)
+- [Quick Start (~30-45 minutes)](#-quick-start-30-45-minutes)
 - [How It Works](#-how-it-works)
 - [Australian ACP Context](#-australian-acp-context)
 - [Option A: Local with Docker Compose (Recommended)](#option-a-local-with-docker-compose)
@@ -20,7 +21,7 @@
 
 ---
 
-## 🚀 Quick Start (10 minutes)
+## 🚀 Quick Start (~30-45 minutes)
 
 ### What You'll Need
 
@@ -31,6 +32,10 @@
 | **A microphone** | Built into most laptops |
 
 **That's it. No Python. No Node.js. No coding.**
+
+> ⏱️ **Time breakdown:** Docker Desktop install (~10 min first time) + Azure OpenAI setup (~15 min) +
+> Deepgram setup (~5 min) + config (~5 min) + docker build (~3-5 min). Already have Docker and cloud
+> accounts? You'll be up in ~5 minutes.
 
 ---
 
@@ -228,8 +233,8 @@ docker compose up -d
 4. You hear the AI's response through your speakers
 5. The conversation transcript appears on the screen
 
-**Your voice data goes: Browser → LiveKit → Azure OpenAI → LiveKit → Browser**
-**Everything stays on your local network. No data is stored.**
+**Your data flows: Browser → LiveKit → Agent → Deepgram (STT) → Azure OpenAI (LLM) → Deepgram (TTS) → Agent → LiveKit → Browser**
+**Audio and text transit through cloud services in real-time but are not stored by them.**
 
 ---
 

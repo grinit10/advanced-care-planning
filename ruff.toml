@@ -3,6 +3,7 @@
 
 target-version = "py312"
 
+[lint]
 # Enable pycodestyle (E), pyflakes (F), isort (I), and more.
 select = [
     "E",   # pycodestyle errors
@@ -36,12 +37,12 @@ exclude = [
     "build",
 ]
 
-# Enable format
-format = true
+[format]
 
-[per-file-ignores]
+[lint.per-file-ignores]
 "__init__.py" = ["F401"]  # allow unused imports in __init__.py
 "tests/**" = ["S101"]     # allow assert in tests
+"http_server.py" = ["S104"]  # 0.0.0.0 binding is intentional for Docker
 
-[mccabe]
+[lint.mccabe]
 max-complexity = 12

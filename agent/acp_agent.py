@@ -1,10 +1,8 @@
-from livekit.plugins import deepgram, openai, silero
-from livekit.agents import ChatContext, ChatMessage
-
-from acp_prompts import get_system_prompt
-
 import os
 
+from acp_prompts import get_system_prompt
+from livekit.agents import ChatContext, ChatMessage
+from livekit.plugins import deepgram, openai, silero
 
 # =============================================================================
 # Credentials loaded from .env (via load_dotenv in main.py)

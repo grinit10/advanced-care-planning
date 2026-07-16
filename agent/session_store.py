@@ -19,10 +19,8 @@ Key schema:
 
 import json
 import logging
-import os
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Optional
 
 import redis.asyncio as aioredis
 
@@ -41,7 +39,7 @@ class SessionStore:
 
     def __init__(self, redis_url: str = "redis://redis:6379/1"):
         self.redis_url = redis_url
-        self._redis: Optional[aioredis.Redis] = None
+        self._redis: aioredis.Redis | None = None
         self._prefix = "session"
 
     async def connect(self):
@@ -64,7 +62,7 @@ class SessionStore:
     async def set_status(self, room_id: str, status: str):
         await self._redis.set(self._key(room_id, "status"), status)
 
-    async def get_status(self, room_id: str) -> Optional[str]:
+    async def get_status(self, room_id: str) -> str | None:
         return await self._redis.get(self._key(room_id, "status"))
 
     # --- Metadata ---
@@ -131,7 +129,7 @@ class SessionStore:
     async def set_audio_path(self, room_id: str, path: str):
         await self._redis.set(self._key(room_id, "audio_path"), path)
 
-    async def get_audio_path(self, room_id: str) -> Optional[str]:
+    async def get_audio_path(self, room_id: str) -> str | None:
         return await self._redis.get(self._key(room_id, "audio_path"))
 
     # --- Plan Summary ---
@@ -139,7 +137,7 @@ class SessionStore:
     async def set_plan_summary(self, room_id: str, summary: str):
         await self._redis.set(self._key(room_id, "plan_summary"), summary)
 
-    async def get_plan_summary(self, room_id: str) -> Optional[str]:
+    async def get_plan_summary(self, room_id: str) -> str | None:
         return await self._redis.get(self._key(room_id, "plan_summary"))
 
     # --- Session lifecycle ---

@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import pytest
-
 from prompt_loader import TTS_FORMATTING_RULES, load_prompt
 
 

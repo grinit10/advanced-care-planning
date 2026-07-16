@@ -11,19 +11,6 @@ import os
 import threading
 from pathlib import Path
 
-from dotenv import load_dotenv
-from livekit.agents import (
-    AutoSubscribe,
-    JobContext,
-    JobProcess,
-    WorkerOptions,
-    cli,
-    llm,
-)
-from livekit.agents import tokenize
-from livekit.agents.tts import StreamAdapter
-from livekit.agents.voice import Agent, AgentSession
-
 from acp_agent import (
     create_initial_context,
     create_llm,
@@ -32,7 +19,19 @@ from acp_agent import (
     create_vad,
 )
 from audio_recorder import ConversationRecorder
-from http_server import init as init_http_server, run_server as run_http_server
+from dotenv import load_dotenv
+from http_server import init as init_http_server
+from http_server import run_server as run_http_server
+from livekit.agents import (
+    JobContext,
+    JobProcess,
+    WorkerOptions,
+    cli,
+    llm,
+    tokenize,
+)
+from livekit.agents.tts import StreamAdapter
+from livekit.agents.voice import Agent, AgentSession
 from preference_extractor import EMPTY_PREFERENCES, extract_preferences
 from session_store import SessionStore, TranscriptEntry
 
@@ -59,6 +58,10 @@ class ACPAgent(Agent):
     to manage transcripts, recordings, and session cleanup.
     """
 
+    # Debounce window for preference extraction — avoids an LLM call after
+    # every single utterance when the user is speaking rapidly.
+    _PREF_DEBOUNCE_SECONDS = 3.0
+
     def __init__(self, chat_ctx, room_id: str, llm_instance: llm.LLM):
         super().__init__(
             instructions="",  # instructions not used — chat_ctx carries the system prompt
@@ -67,8 +70,8 @@ class ACPAgent(Agent):
         self.room_id = room_id
         self.last_msg_count = 0
         self._llm = llm_instance
-        self._tasks = set()
         self._pref_lock = asyncio.Lock()
+        self._debounce_task: asyncio.Task | None = None
 
     async def on_enter(self):
         """Called when the agent session starts — greet the user."""
@@ -109,10 +112,25 @@ class ACPAgent(Agent):
             await session_store.add_transcript_entry(self.room_id, entry)
         self.last_msg_count = len(msgs)
 
-        # Fire background preference extraction (doesn't block conversation)
-        task = asyncio.create_task(self._extract_preferences())
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+        # Debounced preference extraction — cancels any pending extraction
+        # and restarts the timer. This prevents an LLM call after every single
+        # utterance when the user is speaking rapidly. Extraction fires only
+        # after {_PREF_DEBOUNCE_SECONDS}s of inactivity.
+        if self._debounce_task is not None:
+            self._debounce_task.cancel()
+        self._debounce_task = asyncio.create_task(self._debounced_extract())
+
+    async def _debounced_extract(self):
+        """Wait for the debounce window, then extract preferences.
+
+        If cancelled by a new user turn arriving within the window,
+        the extraction is silently skipped.
+        """
+        try:
+            await asyncio.sleep(self._PREF_DEBOUNCE_SECONDS)
+            await self._extract_preferences()
+        except asyncio.CancelledError:
+            pass  # New turn arrived — extraction will re-schedule
 
     async def _extract_preferences(self):
         """Extract structured preferences from the latest exchange asynchronously."""
@@ -160,6 +178,10 @@ class ACPAgent(Agent):
 
     async def on_exit(self):
         """Called when the agent session ends — clean up recording."""
+        # Cancel any pending debounced extraction
+        if self._debounce_task is not None:
+            self._debounce_task.cancel()
+            self._debounce_task = None
         await _cleanup_session(self.room_id)
 
 
@@ -276,18 +298,40 @@ if __name__ == "__main__":
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
 
-    # Run the HTTP server in a background thread with its own event loop
-    def _run_http_loop():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(_start_background_services())
-        loop.run_until_complete(run_http_server())
+    # ── Architecture Note ──────────────────────────────────────────────────
+    # The LiveKit Agent SDK's cli.run_app() is a blocking call that manages
+    # its own internal asyncio event loop. It cannot be await'd or wrapped
+    # in asyncio.gather() — it takes over the main thread.
+    #
+    # The HTTP API server (for session management, email, etc.) runs in a
+    # separate daemon thread with its own event loop. This is the standard
+    # pattern for sidecar HTTP servers alongside LiveKit agents.
+    #
+    # Both share the same Redis-backed SessionStore (via a separate Redis
+    # connection in the child process — see session_store.connect()).
+    # ────────────────────────────────────────────────────────────────────────
 
-    http_thread = threading.Thread(target=_run_http_loop, daemon=True)
+    def _start_http_server():
+        """Run the HTTP API server in a background thread.
+
+        Uses asyncio.run() for clean event loop lifecycle management
+        (creates, runs, and closes the loop automatically).
+        """
+        async def startup():
+            await _start_background_services()
+            await run_http_server()
+
+        asyncio.run(startup())
+
+    http_thread = threading.Thread(
+        target=_start_http_server,
+        name="acp-http-server",
+        daemon=True,
+    )
     http_thread.start()
-    logger.info("HTTP API server thread started on port 8082")
+    logger.info("HTTP API server started on http://0.0.0.0:8082 (thread: %s)", http_thread.name)
 
-    # Start the LiveKit agent
+    # Start the LiveKit agent (blocking — takes over the main thread)
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,

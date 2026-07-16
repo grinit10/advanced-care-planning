@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { Sun, Moon } from "lucide-react";
 import PreJoin from "./components/PreJoin";
 import ConversationView from "./components/ConversationView";
 import { useVoiceAgent } from "./hooks/useVoiceAgent";
@@ -57,7 +58,7 @@ export default function App() {
         setError(message);
       }
     },
-    [connect]
+    [connect],
   );
 
   const handleDisconnect = useCallback(async () => {
@@ -69,7 +70,7 @@ export default function App() {
     async (email: string) => {
       return await registerEmail(email);
     },
-    [registerEmail]
+    [registerEmail],
   );
 
   const handleSendPlan = useCallback(async () => {
@@ -86,15 +87,14 @@ export default function App() {
     return (
       <div className="app">
         <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-          {theme === "light" ? "🌙" : "☀️"}
+          {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
         </button>
         <div className="error-view">
           <h2>Connection Error</h2>
           <p>{error}</p>
           <p className="text-muted">
-            Make sure Docker Compose is running (
-            <code>docker compose up -d</code>) and your .env file has the correct
-            Azure OpenAI credentials.
+            Make sure Docker Compose is running (<code>docker compose up -d</code>) and your .env
+            file has the correct Azure OpenAI credentials.
           </p>
           <button onClick={() => setError(null)}>Try Again</button>
         </div>
@@ -106,7 +106,7 @@ export default function App() {
     return (
       <div className="app">
         <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-          {theme === "light" ? "🌙" : "☀️"}
+          {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
         </button>
         <PreJoin onJoin={handleJoin} connecting={connecting} />
       </div>
@@ -116,7 +116,7 @@ export default function App() {
   return (
     <div className="app">
       <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-        {theme === "light" ? "🌙" : "☀️"}
+        {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
       </button>
       <ConversationView
         transcript={transcript}

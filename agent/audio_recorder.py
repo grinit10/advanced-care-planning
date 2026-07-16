@@ -10,7 +10,6 @@ import os
 import time
 import wave
 from pathlib import Path
-from typing import Optional
 
 from livekit import rtc
 
@@ -35,7 +34,7 @@ class ConversationRecorder:
         self._records_dir = Path(records_dir)
         self._audio_frames: list[bytes] = []
         self._recording = False
-        self._read_task: Optional[asyncio.Task] = None
+        self._read_task: asyncio.Task | None = None
         self._all_streams: list[rtc.AudioStream] = []
 
     async def start(self):
@@ -112,7 +111,7 @@ class ConversationRecorder:
             len(self._audio_frames),
         )
 
-    def save(self, room_id: str) -> Optional[str]:
+    def save(self, room_id: str) -> str | None:
         """Save recorded audio to a WAV file and return the file path."""
         if not self._audio_frames:
             logger.warning("No audio frames to save")

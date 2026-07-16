@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import ConversationView from "../components/ConversationView";
 
 describe("ConversationView", () => {
@@ -32,7 +32,7 @@ describe("ConversationView", () => {
 
     expect(window.open).toHaveBeenCalledWith(
       "http://localhost:8082/transcript/test-room",
-      "_blank"
+      "_blank",
     );
   });
 });

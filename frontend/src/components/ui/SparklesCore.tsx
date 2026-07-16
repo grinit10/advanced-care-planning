@@ -81,18 +81,16 @@ function SparklesCoreInner({
     detectRetina: true,
   };
 
-  return (
-    <Particles
-      id={id}
-      className={className}
-      options={options}
-    />
-  );
+  return <Particles id={id} className={className} options={options} />;
 }
 
 export function SparklesCore(props: SparklesCoreProps) {
   return (
-    <ParticlesProvider init={async (engine) => { await loadSlim(engine); }}>
+    <ParticlesProvider
+      init={async (engine) => {
+        await loadSlim(engine);
+      }}
+    >
       <SparklesCoreInner {...props} />
     </ParticlesProvider>
   );

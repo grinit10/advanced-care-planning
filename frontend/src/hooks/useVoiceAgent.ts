@@ -2,10 +2,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Room, RoomEvent, createLocalAudioTrack } from "livekit-client";
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL ?? "ws://localhost:7880";
-const TOKEN_SERVER_URL =
-  import.meta.env.VITE_TOKEN_SERVER_URL ?? "http://localhost:8081";
-const AGENT_API_URL =
-  import.meta.env.VITE_AGENT_API_URL ?? "http://localhost:8082";
+const TOKEN_SERVER_URL = import.meta.env.VITE_TOKEN_SERVER_URL ?? "http://localhost:8081";
+const AGENT_API_URL = import.meta.env.VITE_AGENT_API_URL ?? "http://localhost:8082";
 
 export interface TranscriptMessage {
   id: string | number;
@@ -26,6 +24,10 @@ export interface SendResult {
 
 /**
  * Hook that manages a LiveKit room connection + ACP session API calls.
+ *
+ * Uses Server-Sent Events (SSE) instead of polling for live preference
+ * and plan summary updates — the EventSource API auto-reconnects if
+ * the connection drops.
  */
 export function useVoiceAgent() {
   const [connecting, setConnecting] = useState(false);
@@ -36,62 +38,23 @@ export function useVoiceAgent() {
   const [preferences, setPreferences] = useState<Record<string, unknown>>({});
   const [planSummary, setPlanSummary] = useState<string>("");
   const roomRef = useRef<Room | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Clean up polling interval on unmount
+  // Clean up EventSource on unmount
   useEffect(() => {
     return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-      }
+      eventSourceRef.current?.close();
     };
   }, []);
 
-  const addTranscript = useCallback(
-    (msg: TranscriptMessage) => {
-      setTranscript((prev) => [...prev, msg]);
-    },
-    []
-  );
-
-
-
-  const fetchPreferences = useCallback(async (currentRoomId: string) => {
-    try {
-      const res = await fetch(
-        `${AGENT_API_URL}/preferences/${encodeURIComponent(currentRoomId)}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.preferences && Object.keys(data.preferences).length > 0) {
-          setPreferences(data.preferences);
-        }
-      }
-    } catch {
-      // Silently fail — polling will retry
-    }
-  }, []);
-
-  const fetchPlanSummary = useCallback(async (currentRoomId: string) => {
-    try {
-      const res = await fetch(
-        `${AGENT_API_URL}/plan/${encodeURIComponent(currentRoomId)}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.summary) {
-          setPlanSummary(data.summary);
-        }
-      }
-    } catch {
-      // Silently fail
-    }
+  const addTranscript = useCallback((msg: TranscriptMessage) => {
+    setTranscript((prev) => [...prev, msg]);
   }, []);
 
   const fetchInitialTranscript = useCallback(async (currentRoomId: string) => {
     try {
       const res = await fetch(
-        `${AGENT_API_URL}/transcript-json/${encodeURIComponent(currentRoomId)}`
+        `${AGENT_API_URL}/transcript-json/${encodeURIComponent(currentRoomId)}`,
       );
       if (res.ok) {
         const data = await res.json();
@@ -101,35 +64,56 @@ export function useVoiceAgent() {
               id: Date.now() + idx,
               role: entry.role as "agent" | "user",
               text: entry.text,
-            }))
+            })),
           );
         }
       }
     } catch {
-      // Silently fail — polling will catch up
+      // Silently fail — SSE will catch up on reconnect
     }
   }, []);
 
-  const startPolling = useCallback((currentRoomId: string) => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-    }
-    // Poll plan + preferences every 1 second for live updates
-    pollRef.current = setInterval(() => {
-      fetchPlanSummary(currentRoomId);
-      fetchPreferences(currentRoomId);
-    }, 1000);
-    // Also fetch immediately
-    fetchPlanSummary(currentRoomId);
-    fetchPreferences(currentRoomId);
-  }, [fetchPlanSummary, fetchPreferences]);
+  const startEventSource = useCallback((currentRoomId: string) => {
+    // Close any existing connection
+    eventSourceRef.current?.close();
+
+    const url = `${AGENT_API_URL}/events/${encodeURIComponent(currentRoomId)}`;
+    const es = new EventSource(url);
+    eventSourceRef.current = es;
+
+    es.addEventListener("preferences", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.preferences && Object.keys(data.preferences).length > 0) {
+          setPreferences(data.preferences);
+        }
+      } catch {
+        // Ignore malformed events
+      }
+    });
+
+    es.addEventListener("plan_summary", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.summary) {
+          setPlanSummary(data.summary);
+        }
+      } catch {
+        // Ignore malformed events
+      }
+    });
+
+    es.onerror = () => {
+      // EventSource auto-reconnects; nothing to do here
+    };
+  }, []);
 
   const connect = useCallback(
     async (roomName: string, identity: string) => {
       setConnecting(true);
       try {
         const res = await fetch(
-          `${TOKEN_SERVER_URL}/token?room=${encodeURIComponent(roomName)}&identity=${encodeURIComponent(identity)}`
+          `${TOKEN_SERVER_URL}/token?room=${encodeURIComponent(roomName)}&identity=${encodeURIComponent(identity)}`,
         );
         if (!res.ok) {
           throw new Error(`Token server error: ${res.statusText}`);
@@ -158,7 +142,9 @@ export function useVoiceAgent() {
 
         room.on(RoomEvent.TrackUnsubscribed, (track) => {
           if (track.kind === "audio") {
-            const audioEl = document.getElementById(`agent-audio-${track.sid}`) as HTMLMediaElement | null;
+            const audioEl = document.getElementById(
+              `agent-audio-${track.sid}`,
+            ) as HTMLMediaElement | null;
             if (audioEl) {
               track.detach(audioEl);
               audioEl.remove();
@@ -212,10 +198,10 @@ export function useVoiceAgent() {
         setRoomId(roomName);
         setConnected(true);
 
-        // Fetch existing transcript and start fast polling (1s intervals)
+        // Fetch existing transcript and open SSE for live updates
         fetchInitialTranscript(roomName);
         setPreferences({});
-        startPolling(roomName);
+        startEventSource(roomName);
 
         addTranscript({
           id: Date.now(),
@@ -230,14 +216,12 @@ export function useVoiceAgent() {
         setConnecting(false);
       }
     },
-    [addTranscript]
+    [addTranscript, fetchInitialTranscript, startEventSource],
   );
 
   const disconnect = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+    eventSourceRef.current?.close();
+    eventSourceRef.current = null;
     roomRef.current?.disconnect();
     roomRef.current = null;
     setConnected(false);
@@ -249,14 +233,11 @@ export function useVoiceAgent() {
     async (email: string): Promise<{ success: boolean; message: string }> => {
       if (!roomId) return { success: false, message: "No active session." };
       try {
-        const res = await fetch(
-          `${AGENT_API_URL}/email/${encodeURIComponent(roomId)}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          }
-        );
+        const res = await fetch(`${AGENT_API_URL}/email/${encodeURIComponent(roomId)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
         const data = await res.json();
         return { success: res.ok, message: data.message || data.error || "OK" };
       } catch (err: unknown) {
@@ -264,16 +245,15 @@ export function useVoiceAgent() {
         return { success: false, message: msg };
       }
     },
-    [roomId]
+    [roomId],
   );
 
   const sendPlan = useCallback(async (): Promise<SendResult> => {
     if (!roomId) return { status: "error", message: "No active session." };
     try {
-      const res = await fetch(
-        `${AGENT_API_URL}/send-plan/${encodeURIComponent(roomId)}`,
-        { method: "POST" }
-      );
+      const res = await fetch(`${AGENT_API_URL}/send-plan/${encodeURIComponent(roomId)}`, {
+        method: "POST",
+      });
       const data = await res.json();
       if (!res.ok) {
         return { status: "error", message: data.error || "Failed to send." };
@@ -288,10 +268,9 @@ export function useVoiceAgent() {
   const closeSession = useCallback(async (): Promise<{ success: boolean; message: string }> => {
     if (!roomId) return { success: false, message: "No active session." };
     try {
-      const res = await fetch(
-        `${AGENT_API_URL}/close/${encodeURIComponent(roomId)}`,
-        { method: "POST" }
-      );
+      const res = await fetch(`${AGENT_API_URL}/close/${encodeURIComponent(roomId)}`, {
+        method: "POST",
+      });
       const data = await res.json();
       disconnect();
       setRoomId("");
@@ -325,6 +304,3 @@ export function useVoiceAgent() {
     closeSession,
   };
 }
-
-
-

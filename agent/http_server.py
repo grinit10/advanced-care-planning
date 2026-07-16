@@ -6,6 +6,7 @@ Provides endpoints for the frontend to manage ACP sessions.
 
 Endpoints:
   GET   /health                        — Health check
+  GET   /events/{room_id}              — SSE stream for live preference/plan updates
   GET   /plan/{room_id}                — Get session data (transcript, preferences, summary)
   POST  /email/{room_id}               — Register an email address  {email: "..."}
   POST  /send-plan/{room_id}           — Email the plan to all registered addresses
@@ -13,14 +14,14 @@ Endpoints:
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
-from typing import Optional
 
 from aiohttp import web
-
-from email_sender import is_configured as email_configured, send_plan_email
+from email_sender import is_configured as email_configured
+from email_sender import send_plan_email
 from session_store import SessionStore
 
 # CORS headers — allow the frontend dev server to call this API
@@ -44,7 +45,7 @@ async def cors_middleware(request: web.Request, handler):
 logger = logging.getLogger("acp-agent.http")
 
 # Global reference set by the agent at startup
-_store: Optional[SessionStore] = None
+_store: SessionStore | None = None
 
 
 def init(store: SessionStore):
@@ -208,6 +209,75 @@ async def _generate_summary(room_id: str) -> str:
 
 async def handle_health(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
+
+
+async def handle_events(request: web.Request) -> web.Response:
+    """Server-Sent Events endpoint for live preference/plan updates.
+
+    Instead of the frontend polling every 1s, this endpoint streams
+    events when data actually changes. The polling still happens but
+    server-side (every 3s), and only sends data when the content hash
+    differs from the last push. Uses a single HTTP connection that
+    the browser's EventSource API auto-reconnects if dropped.
+    """
+    room_id = request.match_info["room_id"]
+    store = await _get_store()
+
+    response = web.StreamResponse(
+        status=200,
+        reason="OK",
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "X-Accel-Buffering": "no",
+        },
+    )
+    await response.prepare(request)
+
+    last_prefs_hash = ""
+    last_summary_hash = ""
+    poll_interval = 3  # seconds
+
+    try:
+        while True:
+            # Check preferences
+            prefs = await store.get_preferences_json(room_id)
+            prefs_hash = hashlib.sha256(
+                json.dumps(prefs, sort_keys=True, default=str).encode()
+            ).hexdigest() if prefs else ""
+
+            if prefs_hash and prefs_hash != last_prefs_hash:
+                last_prefs_hash = prefs_hash
+                data = json.dumps({
+                    "type": "preferences",
+                    "preferences": prefs,
+                })
+                await response.write(f"event: preferences\ndata: {data}\n\n".encode())
+
+            # Check plan summary
+            summary = await store.get_plan_summary(room_id)
+            summary_hash = hashlib.sha256(
+                (summary or "").encode()
+            ).hexdigest()
+
+            if summary and summary_hash != last_summary_hash:
+                last_summary_hash = summary_hash
+                data = json.dumps({
+                    "type": "plan_summary",
+                    "summary": summary,
+                })
+                await response.write(f"event: plan_summary\ndata: {data}\n\n".encode())
+
+            # Send keepalive comment every poll cycle
+            await response.write(b": keepalive\n\n")
+            await response.drain()
+
+            await asyncio.sleep(poll_interval)
+    except (asyncio.CancelledError, ConnectionResetError, ConnectionAbortedError):
+        logger.debug("SSE connection closed for room %s", room_id)
+    return response
 
 
 async def handle_get_recording(request: web.Request) -> web.Response:
@@ -452,6 +522,7 @@ def create_app() -> web.Application:
     """Create the aiohttp application."""
     app = web.Application(middlewares=[cors_middleware])
     app.router.add_get("/health", handle_health)
+    app.router.add_get("/events/{room_id}", handle_events)
     app.router.add_get("/preferences/{room_id}", handle_get_preferences)
     app.router.add_get("/plan/{room_id}", handle_get_plan)
     app.router.add_get("/recording/{room_id}", handle_get_recording)

@@ -15,14 +15,13 @@ To create an Azure Communication Services resource:
 
 import logging
 import os
-from typing import Optional
 
 from azure.communication.email import EmailClient
 
 logger = logging.getLogger("acp-agent.email")
 
 
-def _get_env(key: str) -> Optional[str]:
+def _get_env(key: str) -> str | None:
     return os.environ.get(key) or None
 
 
@@ -39,7 +38,7 @@ def send_plan_email(
     plan_summary: str,
     transcript: list[dict],
     preferences: dict,
-    audio_path: Optional[str] = None,
+    audio_path: str | None = None,
 ) -> bool:
     """
     Send an ACP plan email via Azure Communication Services.
@@ -103,7 +102,7 @@ def send_plan_email(
         html_parts.append("<p style='color:#666;'>No transcript available.</p>")
 
     # Next steps
-    html_parts.append(f"""
+    html_parts.append("""
         <hr style='border:none;border-top:1px solid #ddd;margin:24px 0;'>
         <p style="color:#555;font-size:0.9em;">
             <strong>Next steps:</strong> Share these wishes with your

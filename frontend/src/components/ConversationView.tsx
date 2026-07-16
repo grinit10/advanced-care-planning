@@ -78,13 +78,25 @@ export default function ConversationView({
         <div className="plan-panel">
           <h2>Your ACP Session</h2>
           {!connected && (
-            <p className="call-ended-notice" style={{ padding: "12px 16px", background: "rgba(239, 68, 68, 0.08)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.15)", borderRadius: "8px", fontSize: "0.9rem", fontWeight: "500", marginBottom: "16px" }}>
+            <p
+              className="call-ended-notice"
+              style={{
+                padding: "12px 16px",
+                background: "rgba(239, 68, 68, 0.08)",
+                color: "#ef4444",
+                border: "1px solid rgba(239, 68, 68, 0.15)",
+                borderRadius: "8px",
+                fontSize: "0.9rem",
+                fontWeight: "500",
+                marginBottom: "16px",
+              }}
+            >
               🔴 Conversation ended. Your transcript and recording have been compiled.
             </p>
           )}
           <p className="text-muted">
-            Your conversation data is stored locally. Add your email to receive the
-            plan summary and voice recording, then close the session when done.
+            Your conversation data is stored in Redis (inside Docker). Add your email to receive the
+            plan summary and voice recording, then close the session to delete all data.
           </p>
 
           {/* Email registration */}
@@ -101,7 +113,9 @@ export default function ConversationView({
               <button onClick={handleRegisterEmail}>Register</button>
             </div>
             {emailStatus && (
-              <p className={`plan-msg ${emailStatus.includes("fail") || emailStatus.includes("Error") ? "msg-error" : "msg-ok"}`}>
+              <p
+                className={`plan-msg ${emailStatus.includes("fail") || emailStatus.includes("Error") ? "msg-error" : "msg-ok"}`}
+              >
                 {emailStatus}
               </p>
             )}
@@ -111,14 +125,16 @@ export default function ConversationView({
           <div className="plan-section">
             <h3>2. Send plan to email</h3>
             <p className="text-muted">
-              Receive your conversation summary, preferences, and voice recording
-              via email. Requires Azure Communication Services configured in .env.
+              Receive your conversation summary, preferences, and voice recording via email.
+              Requires Azure Communication Services configured in .env.
             </p>
             <button onClick={handleSendPlan} disabled={sending}>
               {sending ? "Sending..." : "Send Plan"}
             </button>
             {sendStatus && (
-              <p className={`plan-msg ${sendStatus.includes("fail") || sendStatus.includes("Error") ? "msg-error" : "msg-ok"}`}>
+              <p
+                className={`plan-msg ${sendStatus.includes("fail") || sendStatus.includes("Error") ? "msg-error" : "msg-ok"}`}
+              >
                 {sendStatus}
               </p>
             )}
@@ -127,15 +143,9 @@ export default function ConversationView({
           {/* Downloads */}
           <div className="plan-section">
             <h3>3. Download your data</h3>
-            <p className="text-muted">
-              Download your conversation transcript before closing.
-            </p>
+            <p className="text-muted">Download your conversation transcript before closing.</p>
             <div className="download-row">
-              <a
-                className="btn-download"
-                href="#"
-                onClick={handleDownloadTranscript}
-              >
+              <a className="btn-download" href="#" onClick={handleDownloadTranscript}>
                 Download Transcript
               </a>
             </div>
@@ -145,29 +155,25 @@ export default function ConversationView({
           <div className="plan-section">
             <h3>4. Close session</h3>
             <p className="text-muted">
-              This deletes your conversation data and audio recording from the
-              server. You can send the plan to email first.
+              This deletes your conversation data and audio recording from the server. You can send
+              the plan to email first.
             </p>
-            <button
-              className="btn-close"
-              onClick={handleCloseSession}
-              disabled={closing}
-            >
-              {closing
-                ? "Closing..."
-                : confirmClose
-                  ? "Confirm — delete my data"
-                  : "Close Session"}
+            <button className="btn-close" onClick={handleCloseSession} disabled={closing}>
+              {closing ? "Closing..." : confirmClose ? "Confirm — delete my data" : "Close Session"}
             </button>
             {confirmClose && !closing && (
-              <p className="plan-msg msg-warn">
-                Click again to confirm. This cannot be undone.
-              </p>
+              <p className="plan-msg msg-warn">Click again to confirm. This cannot be undone.</p>
             )}
           </div>
 
           {connected && (
-            <button className="btn-back" onClick={() => { setMode("conversation"); setConfirmClose(false); }}>
+            <button
+              className="btn-back"
+              onClick={() => {
+                setMode("conversation");
+                setConfirmClose(false);
+              }}
+            >
               Back to conversation
             </button>
           )}
@@ -181,7 +187,14 @@ export default function ConversationView({
       <header className="dashboard-header">
         <div className="brand">
           <div className="brand-logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </div>
@@ -221,7 +234,7 @@ export default function ConversationView({
                 <span className="listening-label">Assistant is listening...</span>
               )}
             </div>
-            
+
             <div className="transcript-wrapper">
               <TranscriptPanel messages={transcript} agentSpeaking={agentSpeaking} />
             </div>
