@@ -8,7 +8,7 @@ const AGENT_API_URL =
   import.meta.env.VITE_AGENT_API_URL ?? "http://localhost:8082";
 
 export interface TranscriptMessage {
-  id: number;
+  id: string | number;
   role: "agent" | "user";
   text: string;
 }
@@ -54,30 +54,7 @@ export function useVoiceAgent() {
     []
   );
 
-  const fetchTranscript = useCallback(async (currentRoomId: string) => {
-    try {
-      const res = await fetch(
-        `${AGENT_API_URL}/transcript-json/${encodeURIComponent(currentRoomId)}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.transcript && Array.isArray(data.transcript)) {
-          setTranscript((prev) => {
-            if (data.transcript.length <= prev.length) return prev;
-            return data.transcript.map(
-              (entry: { role: string; text: string }, idx: number) => ({
-                id: idx + 1,
-                role: entry.role as "agent" | "user",
-                text: entry.text,
-              })
-            );
-          });
-        }
-      }
-    } catch {
-      // Silently fail — polling will retry
-    }
-  }, []);
+
 
   const fetchPreferences = useCallback(async (currentRoomId: string) => {
     try {
@@ -137,17 +114,15 @@ export function useVoiceAgent() {
     if (pollRef.current) {
       clearInterval(pollRef.current);
     }
-    // Poll plan + transcript + preferences every 1 second for live updates
+    // Poll plan + preferences every 1 second for live updates
     pollRef.current = setInterval(() => {
       fetchPlanSummary(currentRoomId);
-      fetchTranscript(currentRoomId);
       fetchPreferences(currentRoomId);
     }, 1000);
     // Also fetch immediately
     fetchPlanSummary(currentRoomId);
-    fetchTranscript(currentRoomId);
     fetchPreferences(currentRoomId);
-  }, [fetchPlanSummary, fetchTranscript, fetchPreferences]);
+  }, [fetchPlanSummary, fetchPreferences]);
 
   const connect = useCallback(
     async (roomName: string, identity: string) => {
@@ -195,6 +170,31 @@ export function useVoiceAgent() {
         room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
           const agentSpeaker = speakers.find((p) => p.identity?.startsWith("agent-"));
           setAgentSpeaking(!!agentSpeaker);
+        });
+
+        // Listen for live transcription segments (user STT and agent TTS)
+        room.on(RoomEvent.TranscriptionReceived, (segments, participant) => {
+          const role = participant?.identity?.startsWith("agent-") ? "agent" : "user";
+          setTranscript((prev) => {
+            const next = [...prev];
+            for (const segment of segments) {
+              const msgId = segment.id;
+              const existingIdx = next.findIndex((m) => m.id === msgId);
+              if (existingIdx !== -1) {
+                next[existingIdx] = {
+                  ...next[existingIdx],
+                  text: segment.text,
+                };
+              } else {
+                next.push({
+                  id: msgId,
+                  role,
+                  text: segment.text,
+                });
+              }
+            }
+            return next;
+          });
         });
 
         await room.connect(LIVEKIT_URL, token);

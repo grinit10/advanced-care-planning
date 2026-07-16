@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 export interface TranscriptMessage {
-  id: number;
+  id: string | number;
   role: "agent" | "user";
   text: string;
 }
