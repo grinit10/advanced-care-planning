@@ -61,7 +61,7 @@ class ACPAgent(Agent):
 
     # Debounce window for preference extraction — avoids an LLM call after
     # every single utterance when the user is speaking rapidly.
-    _PREF_DEBOUNCE_SECONDS = 3.0
+    _PREF_DEBOUNCE_SECONDS = 8.0
 
     def __init__(self, chat_ctx, room_id: str, llm_instance: llm.LLM):
         super().__init__(

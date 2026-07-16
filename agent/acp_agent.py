@@ -10,8 +10,7 @@ from livekit.plugins import deepgram, groq, openai, silero
 AZURE_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
 AZURE_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")
 AZURE_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
-AZURE_LLM_DEPLOYMENT = os.environ.get("AZURE_OPENAI_LLM_DEPLOYMENT", "")
-AZURE_EXTRACTOR_LLM_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT") or AZURE_LLM_DEPLOYMENT
+AZURE_EXTRACTOR_LLM_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT", "")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_VOICE_MODEL = os.environ.get("GROQ_VOICE_MODEL", "llama-3.1-8b-instant")

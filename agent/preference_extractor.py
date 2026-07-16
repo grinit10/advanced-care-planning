@@ -182,6 +182,17 @@ def _parse_json_response(text: str) -> dict[str, Any] | None:
         return None
 
 
+def _canonical_key(item: Any) -> Any:
+    """Return a hashable, canonical representation of a potentially nested dict/list/set."""
+    if isinstance(item, dict):
+        return tuple((k, _canonical_key(item[k])) for k in sorted(item.keys()))
+    elif isinstance(item, list):
+        return tuple(_canonical_key(x) for x in item)
+    elif isinstance(item, set):
+        return tuple(_canonical_key(x) for x in sorted(list(item), key=str))
+    return item
+
+
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Deep-merge two dicts. Lists are appended, scalars are overwritten."""
     result = {}
@@ -192,13 +203,14 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
             if isinstance(b, dict) and isinstance(o, dict):
                 result[key] = _deep_merge(b, o)
             elif isinstance(b, list) and isinstance(o, list):
-                # Append new items, avoid duplicates
-                seen = set(str(item) for item in b)
-                merged = list(b)
-                for item in o:
-                    if str(item) not in seen:
+                # Append new items, avoid duplicates (independent of key order in dicts)
+                seen = set()
+                merged = []
+                for item in b + o:
+                    k = _canonical_key(item)
+                    if k not in seen:
+                        seen.add(k)
                         merged.append(item)
-                        seen.add(str(item))
                 result[key] = merged
             else:
                 result[key] = o if o is not None else b

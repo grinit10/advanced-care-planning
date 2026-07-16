@@ -1,9 +1,37 @@
-# 🏥 Advanced Care Planning — Voice AI Assistant
+# 🏥 Advanced Care Planning (ACP) — Voice AI Assistant
 
-> **Have a conversation with AI about your future healthcare wishes.**
-> Runs locally via Docker — your conversation data is processed by Groq LPU (Sydney, Australia) for fast voice responses, Azure OpenAI (Australia East) for background preference extraction,
-> and Deepgram (AWS Sydney) in real-time, and is **not stored** by either service.
-> Designed with the Australian healthcare context in mind.
+> **A compassionate, conversational voice assistant that helps people think through and document their future healthcare wishes.**
+
+---
+
+### 💡 What is Advanced Care Planning (ACP)?
+Imagine a situation where you become seriously ill or injured, and you cannot speak or make decisions for yourself. Who will speak for you? What kind of medical treatments would you want—or not want?
+* **Advanced Care Planning (ACP)** is the process of thinking about, discussing, and planning for your future health and personal care.
+* It ensures your values, beliefs, and treatment preferences are known so they can guide your family and healthcare team if you cannot communicate.
+
+### 🎯 Purpose of This Solution
+Documenting future wishes can feel intimidating, clinical, or emotionally overwhelming. This solution provides a **friendly, natural voice assistant** that:
+1. **Guides the Conversation**: Gently walks a patient through key topics (substitute decision-makers, treatment preferences, quality of life thresholds, and faith/cultural values) in a conversational, non-threatening way.
+2. **Generates an Actionable Plan**: Dynamically extracts preferences in the background to build a structured summary and downloadable Word document (`.docx`) of their wishes.
+3. **Protects Patient Dignity & Privacy**: Designed specifically for clinical tablets on-site, ensuring zero data is persisted locally and all information is vanished once the session ends.
+
+### ⚙️ How It Works (In Simple Terms)
+1. **The Facilitator Starts the App**: A social worker, nurse, or family member opens the app, enters the patient's name, and starts the session.
+2. **The Patient Speaks**: The patient speaks naturally to the assistant as if talking to a caring companion.
+3. **The AI Listens & Responds**:
+   * **Deepgram STT** translates the patient's speech to text in real-time.
+   * **Groq LPU (Sydney)** generates natural, empathetic, and ultra-low-latency voice responses.
+   * **Deepgram TTS** converts the text back to human-like speech.
+4. **The Background Extractor Summarizes**: While the conversation is happening, **Azure OpenAI** compiles and refines a structured care plan in the background.
+5. **The Plan is Shared**: At the end of the session, the facilitator can email the generated plan as a formatted Word Document (`.docx`) and WAV recording, or download it immediately.
+
+---
+
+> [!IMPORTANT]
+> **Facilitated & Ephemeral Privacy by Design**
+> * **Clinician-Led/Facilitated Sessions**: The assistant is designed to be opened and configured by a healthcare practitioner, social worker, or family member (the facilitator) who then hands the device to the elderly user.
+> * **Strict Ephemerality**: All patient preferences and session transcripts are stored strictly in-memory (volatile Redis). No patient data is ever persisted to disk. When the container reboots or a new session starts, the previous user's sensitive data is completely vaporized. This ensures zero data leakage on shared clinical tablets.
+> * **Retrieval & Sharing Window**: Session summaries, emails, or reports can *only* be shared or retrieved while the active browser session is open. Once the tab is closed, refreshed, or the Docker containers are stopped, the data is permanently destroyed and cannot be recovered.
 
 ---
 
@@ -141,13 +169,13 @@ cd advanced-care-planning
 AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
 AZURE_OPENAI_API_KEY=your-api-key-here
 AZURE_OPENAI_API_VERSION=2024-10-01-preview
-AZURE_OPENAI_LLM_DEPLOYMENT=gpt-4.1-mini-aus
-AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT=gpt-5.4-mini-aus
+AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT=gpt-4o-mini
 GROQ_API_KEY=your-groq-api-key-here
 GROQ_VOICE_MODEL=llama-3.1-8b-instant
 DEEPGRAM_API_KEY=your-deepgram-api-key-here
 LIVEKIT_API_KEY=devkey
 LIVEKIT_API_SECRET=devsecret
+ACS_SENDER_DOMAIN=DoNotReply@abc123.azurecomm.net
 ```
 
 5. Replace these values with what you copied in Step 2c:
