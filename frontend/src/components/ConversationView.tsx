@@ -1,5 +1,5 @@
 import { useState } from "react";
-import TranscriptPanel, { TranscriptMessage } from "./TranscriptPanel";
+import { TranscriptMessage } from "../hooks/useVoiceAgent";
 
 const AGENT_API_URL = import.meta.env.VITE_AGENT_API_URL ?? "http://localhost:8082";
 
@@ -7,6 +7,7 @@ interface ConversationViewProps {
   transcript: TranscriptMessage[];
   agentSpeaking: boolean;
   preferences: Record<string, unknown>;
+  planSummary: string;
   roomId: string;
   onRegisterEmail: (email: string) => Promise<{ success: boolean; message: string }>;
   onSendPlan: () => Promise<{ status: string; message: string }>;
@@ -17,7 +18,6 @@ interface ConversationViewProps {
 type PanelMode = "conversation" | "plan";
 
 export default function ConversationView({
-  transcript,
   agentSpeaking,
   preferences,
   roomId,
@@ -27,7 +27,6 @@ export default function ConversationView({
   onDisconnect,
 }: ConversationViewProps) {
   const [mode, setMode] = useState<PanelMode>("conversation");
-  const [prefsExpanded, setPrefsExpanded] = useState(false);
   const [email, setEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
@@ -198,27 +197,10 @@ export default function ConversationView({
         </div>
       </header>
 
-      {/* Live Preferences Panel */}
-      <div className={`prefs-panel ${prefsExpanded ? "expanded" : ""}`}>
-        <button
-          className="prefs-toggle"
-          onClick={() => setPrefsExpanded(!prefsExpanded)}
-        >
-          <span>Preferences</span>
-          <span className="prefs-count">
-            {Object.values(preferences).filter((v: unknown) => (v as Record<string, unknown>)?.discussed === true).length}
-            {" "}captured
-          </span>
-          <span className={`prefs-arrow ${prefsExpanded ? "open" : ""}`}>▸</span>
-        </button>
-        {prefsExpanded && (
-          <div className="prefs-content">
-            <PreferencesView preferences={preferences} />
-          </div>
-        )}
+      {/* ACP Sections — main page content */}
+      <div className="acp-sections">
+        <PreferencesView preferences={preferences} />
       </div>
-
-      <TranscriptPanel messages={transcript} agentSpeaking={agentSpeaking} />
 
       <footer className="conversation-footer">
         <div className="mic-indicator">
@@ -242,7 +224,7 @@ export default function ConversationView({
 }
 
 // ---------------------------------------------------------------------------
-// Live Preferences View
+// Helpers
 // ---------------------------------------------------------------------------
 
 function _fmt(val: unknown): string {
@@ -251,6 +233,10 @@ function _fmt(val: unknown): string {
   if (Array.isArray(val)) return val.length > 0 ? val.join(", ") : "";
   return String(val);
 }
+
+// ---------------------------------------------------------------------------
+// ACP Sections View — shows all 6 sections as cards
+// ---------------------------------------------------------------------------
 
 function PreferencesView({ preferences }: { preferences: Record<string, unknown> }) {
   const sections: { key: string; label: string; fields: { key: string; label: string }[] }[] = [
@@ -307,64 +293,43 @@ function PreferencesView({ preferences }: { preferences: Record<string, unknown>
     },
   ];
 
-  const discussed = sections.filter(
-    (s) => (preferences[s.key] as Record<string, unknown>)?.discussed === true
-  );
-  const notDiscussed = sections.filter(
-    (s) => (preferences[s.key] as Record<string, unknown>)?.discussed !== true
-  );
-
-  if (discussed.length === 0 && notDiscussed.length === 0) {
-    return <p className="prefs-empty">Listening for preferences...</p>;
-  }
-
   return (
-    <div className="prefs-view">
-      {discussed.map((section) => {
+    <div className="acp-sections-grid">
+      {sections.map((section) => {
         const data = preferences[section.key] as Record<string, unknown> | undefined;
+        const isDiscussed = data?.discussed === true;
         return (
-          <div key={section.key} className="prefs-section discussed">
-            <div className="prefs-section-header">
-              <span className="prefs-section-check">✓</span>
-              <span className="prefs-section-label">{section.label}</span>
+          <div key={section.key} className={"acp-card " + (isDiscussed ? "discussed" : "pending")}>
+            <div className="acp-card-header">
+              <span className="acp-card-status">{isDiscussed ? "✓" : "○"}</span>
+              <span className="acp-card-title">{section.label}</span>
             </div>
-            <div className="prefs-section-fields">
-              {section.fields.map((field) => {
-                const raw = data?.[field.key];
-                const val = _fmt(raw);
-                if (!val) return null;
-                return (
-                  <div key={field.key} className="prefs-field">
-                    <span className="prefs-field-label">{field.label}</span>
-                    <span className="prefs-field-value">{val}</span>
-                  </div>
-                );
-              })}
-              {data && _fmt(data.notes) && (
-                <div className="prefs-field">
-                  <span className="prefs-field-label">Notes</span>
-                  <span className="prefs-field-value prefs-notes">{_fmt(data.notes)}</span>
+            <div className="acp-card-body">
+              {isDiscussed ? (
+                section.fields.map((field) => {
+                  const raw = data?.[field.key];
+                  const val = _fmt(raw);
+                  if (!val) return null;
+                  return (
+                    <div key={field.key} className="acp-field">
+                      <span className="acp-field-label">{field.label}</span>
+                      <span className="acp-field-value">{val}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="acp-pending">Waiting for this topic to come up in conversation...</p>
+              )}
+              {isDiscussed && data && _fmt(data.notes) && (
+                <div className="acp-field">
+                  <span className="acp-field-label">Notes</span>
+                  <span className="acp-field-value">{_fmt(data.notes)}</span>
                 </div>
               )}
             </div>
           </div>
         );
       })}
-
-      {notDiscussed.length > 0 && (
-        <details className="prefs-not-discussed">
-          <summary className="prefs-not-discussed-summary">
-            Not yet discussed ({notDiscussed.length})
-          </summary>
-          <div className="prefs-not-discussed-list">
-            {notDiscussed.map((section) => (
-              <span key={section.key} className="prefs-pending-tag">
-                {section.label}
-              </span>
-            ))}
-          </div>
-        </details>
-      )}
     </div>
   );
 }

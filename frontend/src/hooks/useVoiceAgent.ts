@@ -34,6 +34,7 @@ export function useVoiceAgent() {
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [roomId, setRoomId] = useState<string>("");
   const [preferences, setPreferences] = useState<Record<string, unknown>>({});
+  const [planSummary, setPlanSummary] = useState<string>("");
   const roomRef = useRef<Room | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -62,13 +63,14 @@ export function useVoiceAgent() {
         const data = await res.json();
         if (data.transcript && Array.isArray(data.transcript)) {
           setTranscript((prev) => {
-            // Only update if there are new entries
             if (data.transcript.length <= prev.length) return prev;
-            return data.transcript.map((entry: { role: string; text: string }, idx: number) => ({
-              id: idx + 1,
-              role: entry.role as "agent" | "user",
-              text: entry.text,
-            }));
+            return data.transcript.map(
+              (entry: { role: string; text: string }, idx: number) => ({
+                id: idx + 1,
+                role: entry.role as "agent" | "user",
+                text: entry.text,
+              })
+            );
           });
         }
       }
@@ -93,19 +95,59 @@ export function useVoiceAgent() {
     }
   }, []);
 
+  const fetchPlanSummary = useCallback(async (currentRoomId: string) => {
+    try {
+      const res = await fetch(
+        `${AGENT_API_URL}/plan/${encodeURIComponent(currentRoomId)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.summary) {
+          setPlanSummary(data.summary);
+        }
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  const fetchInitialTranscript = useCallback(async (currentRoomId: string) => {
+    try {
+      const res = await fetch(
+        `${AGENT_API_URL}/transcript-json/${encodeURIComponent(currentRoomId)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.transcript && Array.isArray(data.transcript) && data.transcript.length > 0) {
+          setTranscript(
+            data.transcript.map((entry: { role: string; text: string }, idx: number) => ({
+              id: Date.now() + idx,
+              role: entry.role as "agent" | "user",
+              text: entry.text,
+            }))
+          );
+        }
+      }
+    } catch {
+      // Silently fail — polling will catch up
+    }
+  }, []);
+
   const startPolling = useCallback((currentRoomId: string) => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
     }
-    // Poll every 3 seconds for live transcript and preference updates
+    // Poll plan + transcript + preferences every 1 second for live updates
     pollRef.current = setInterval(() => {
+      fetchPlanSummary(currentRoomId);
       fetchTranscript(currentRoomId);
       fetchPreferences(currentRoomId);
-    }, 3000);
+    }, 1000);
     // Also fetch immediately
+    fetchPlanSummary(currentRoomId);
     fetchTranscript(currentRoomId);
     fetchPreferences(currentRoomId);
-  }, [fetchTranscript, fetchPreferences]);
+  }, [fetchPlanSummary, fetchTranscript, fetchPreferences]);
 
   const connect = useCallback(
     async (roomName: string, identity: string) => {
@@ -171,7 +213,8 @@ export function useVoiceAgent() {
         setRoomId(roomName);
         setConnected(true);
 
-        // Start polling for live preferences
+        // Fetch existing transcript and start fast polling (1s intervals)
+        fetchInitialTranscript(roomName);
         setPreferences({});
         startPolling(roomName);
 
@@ -268,6 +311,7 @@ export function useVoiceAgent() {
     agentSpeaking,
     transcript,
     preferences,
+    planSummary,
     roomId,
     connect,
     disconnect,
@@ -276,3 +320,6 @@ export function useVoiceAgent() {
     closeSession,
   };
 }
+
+
+

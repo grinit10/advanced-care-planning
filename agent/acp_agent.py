@@ -68,7 +68,7 @@ def create_tts() -> deepgram.TTS:
     All voice data stays in Australia (AWS ap-southeast-2, Sydney).
     """
     return deepgram.TTS(
-        model="aura-2-asteria-en",
+        model="aura-2-theia-en",
         api_key=DEEPGRAM_API_KEY,
         base_url="https://api.au.deepgram.com/v1/speak",
         # 24kHz sample rate for high-quality audio

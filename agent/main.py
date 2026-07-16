@@ -79,15 +79,13 @@ class ACPAgent(Agent):
             "what matters most to you. Shall we begin?"
         )
         # Log the first agent message
-        await session_store.add_transcript_entry(
-            self.room_id,
-            TranscriptEntry(role="agent", text=(
-                "Hi, I'm your Advanced Care Planning assistant. "
-                "I'm here to help you think through and document your healthcare wishes "
-                "for the future. There are no right or wrong answers — this is about "
-                "what matters most to you. Shall we begin?"
-            )),
-        )
+        greeting_entry = TranscriptEntry(role="agent", text=(
+            "Hi, I'm your Advanced Care Planning assistant. "
+            "I'm here to help you think through and document your healthcare wishes "
+            "for the future. There are no right or wrong answers — this is about "
+            "what matters most to you. Shall we begin?"
+        ))
+        await session_store.add_transcript_entry(self.room_id, greeting_entry)
         self.last_msg_count = len(self.chat_ctx.messages())
 
     async def on_user_turn_completed(
@@ -229,10 +227,11 @@ async def entrypoint(job: JobContext):
                 "min_duration": 0.3,
                 "min_words": 2,
             },
-            # Hypothesis endpointing — uses STT interim results to detect
-            # sentence completion faster than waiting for silence
+            # Fixed endpointing — waits for a short silence to confirm
+            # the user has finished speaking. Reduced delays from the
+            # original 0.6/3.0 for faster turn-taking.
             "endpointing": {
-                "mode": "hypothesis",
+                "mode": "fixed",
                 "min_delay": 0.4,
                 "max_delay": 1.5,
             },

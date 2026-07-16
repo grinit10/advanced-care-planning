@@ -21,6 +21,7 @@ export default function App() {
     agentSpeaking,
     transcript,
     preferences,
+    planSummary,
     roomId,
     connect,
     disconnect,
@@ -116,6 +117,7 @@ export default function App() {
         transcript={transcript}
         agentSpeaking={agentSpeaking}
         preferences={preferences}
+        planSummary={planSummary}
         roomId={roomId}
         onRegisterEmail={handleRegisterEmail}
         onSendPlan={handleSendPlan}
