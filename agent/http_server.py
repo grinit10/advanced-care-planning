@@ -405,6 +405,26 @@ async def handle_close(request: web.Request) -> web.Response:
     # Get audio path for cleanup
     audio_path = await store.get_audio_path(room_id)
 
+    # Send plan to registered emails before deleting data
+    emails = await store.get_emails(room_id)
+    if emails and email_configured():
+        transcript = await store.get_transcript(room_id)
+        preferences = await store.get_preferences(room_id)
+        summary = await store.get_plan_summary(room_id)
+        if not summary:
+            summary = await _generate_summary(room_id)
+        for email in emails:
+            try:
+                send_plan_email(
+                    to_email=email,
+                    plan_summary=summary,
+                    transcript=transcript,
+                    preferences=preferences,
+                    audio_path=audio_path,
+                )
+            except Exception as e:
+                logger.error("Failed to send email to %s on close: %s", email, e)
+
     # Close session and delete Redis data
     data = await store.close_session(room_id)
 

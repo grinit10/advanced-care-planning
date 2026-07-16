@@ -14,6 +14,7 @@ function getInitialTheme(): Theme {
 export default function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [error, setError] = useState<string | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   const {
     connecting,
@@ -48,6 +49,7 @@ export default function App() {
   const handleJoin = useCallback(
     async (roomName: string, identity: string) => {
       setError(null);
+      setShowSummary(false);
       try {
         await connect(roomName, identity);
       } catch (err: unknown) {
@@ -58,8 +60,9 @@ export default function App() {
     [connect]
   );
 
-  const handleDisconnect = useCallback(() => {
+  const handleDisconnect = useCallback(async () => {
     disconnect();
+    setShowSummary(true);
   }, [disconnect]);
 
   const handleRegisterEmail = useCallback(
@@ -74,7 +77,9 @@ export default function App() {
   }, [sendPlan]);
 
   const handleCloseSession = useCallback(async () => {
-    return await closeSession();
+    const res = await closeSession();
+    setShowSummary(false);
+    return res;
   }, [closeSession]);
 
   if (error) {
@@ -97,7 +102,7 @@ export default function App() {
     );
   }
 
-  if (!connected) {
+  if (!connected && !showSummary) {
     return (
       <div className="app">
         <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
@@ -123,6 +128,7 @@ export default function App() {
         onSendPlan={handleSendPlan}
         onCloseSession={handleCloseSession}
         onDisconnect={handleDisconnect}
+        connected={connected}
       />
     </div>
   );

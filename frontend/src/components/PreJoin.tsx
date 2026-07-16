@@ -12,8 +12,9 @@ export default function PreJoin({ onJoin, connecting }: PreJoinProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    // Use a simple room name — one room per conversation
-    onJoin("acp-room", name.trim());
+    // Generate a unique room name per conversation to isolate sessions
+    const uniqueRoom = `acp-room-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    onJoin(uniqueRoom, name.trim());
   };
 
   return (

@@ -46,20 +46,26 @@ class ConversationRecorder:
 
         streams = []
 
-        # 1. Subscribe to the participant's audio track
-        participant = self._room.remote_participants.get(
-            self._participant_identity
-        )
-        if participant:
-            for pub in participant.track_publications.values():
-                if pub.kind == rtc.TrackKind.KIND_AUDIO and pub.track:
-                    stream = rtc.AudioStream(pub.track)
-                    streams.append(stream)
-                    break
+        # Wait up to 5 seconds for the participant's audio track to be published and subscribed
+        for _ in range(50):
+            if not self._recording:
+                return
+            participant = self._room.remote_participants.get(
+                self._participant_identity
+            )
+            if participant:
+                for pub in participant.track_publications.values():
+                    if pub.kind == rtc.TrackKind.KIND_AUDIO and pub.track:
+                        stream = rtc.AudioStream(pub.track)
+                        streams.append(stream)
+                        break
+            if streams:
+                break
+            await asyncio.sleep(0.1)
 
         if not streams:
             logger.warning(
-                "No audio track for %s. Recording disabled.",
+                "No audio track for %s after waiting. Recording disabled.",
                 self._participant_identity,
             )
             self._recording = False
@@ -73,10 +79,11 @@ class ConversationRecorder:
         """Read audio frames from all subscribed streams concurrently."""
         async def read_one(stream: rtc.AudioStream):
             try:
-                async for frame in stream:
+                async for event in stream:
                     if not self._recording:
                         break
-                    # frame.data is a numpy array; convert to bytes
+                    frame = getattr(event, "frame", event)
+                    # frame.data is a memoryview/numpy array; convert to bytes
                     self._audio_frames.append(frame.data.tobytes())
             except Exception as e:
                 if self._recording:

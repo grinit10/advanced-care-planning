@@ -1,6 +1,8 @@
 port: 7880
 bind_addresses:
   - "0.0.0.0"
+room:
+  empty_timeout: 10
 rtc:
   use_external_ip: false
 redis:

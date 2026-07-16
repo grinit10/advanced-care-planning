@@ -168,7 +168,6 @@ export function useVoiceAgent() {
 
         room.on(RoomEvent.Disconnected, () => {
           setConnected(false);
-          setTranscript([]);
         });
 
         room.on(RoomEvent.TrackSubscribed, (track) => {
@@ -242,8 +241,6 @@ export function useVoiceAgent() {
     roomRef.current?.disconnect();
     roomRef.current = null;
     setConnected(false);
-    setRoomId("");
-    setPreferences({});
   }, []);
 
   // --- Session API calls ---
@@ -297,10 +294,18 @@ export function useVoiceAgent() {
       );
       const data = await res.json();
       disconnect();
+      setRoomId("");
+      setPreferences({});
+      setTranscript([]);
+      setPlanSummary("");
       return { success: res.ok, message: data.message || "Session closed." };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       disconnect();
+      setRoomId("");
+      setPreferences({});
+      setTranscript([]);
+      setPlanSummary("");
       return { success: true, message: msg };
     }
   }, [roomId, disconnect]);

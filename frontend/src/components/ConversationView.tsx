@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { TranscriptMessage } from "../hooks/useVoiceAgent";
+import TranscriptPanel from "./TranscriptPanel";
 
 const AGENT_API_URL = import.meta.env.VITE_AGENT_API_URL ?? "http://localhost:8082";
 
@@ -13,11 +14,13 @@ interface ConversationViewProps {
   onSendPlan: () => Promise<{ status: string; message: string }>;
   onCloseSession: () => Promise<{ success: boolean; message: string }>;
   onDisconnect: () => void;
+  connected: boolean;
 }
 
 type PanelMode = "conversation" | "plan";
 
 export default function ConversationView({
+  transcript,
   agentSpeaking,
   preferences,
   roomId,
@@ -25,6 +28,7 @@ export default function ConversationView({
   onSendPlan,
   onCloseSession,
   onDisconnect,
+  connected,
 }: ConversationViewProps) {
   const [mode, setMode] = useState<PanelMode>("conversation");
   const [email, setEmail] = useState("");
@@ -63,11 +67,16 @@ export default function ConversationView({
     await onCloseSession();
   };
 
-  if (mode === "plan") {
+  if (mode === "plan" || !connected) {
     return (
-      <div className="conversation">
+      <div className="conversation-container">
         <div className="plan-panel">
           <h2>Your ACP Session</h2>
+          {!connected && (
+            <p className="call-ended-notice" style={{ padding: "12px 16px", background: "rgba(239, 68, 68, 0.08)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.15)", borderRadius: "8px", fontSize: "0.9rem", fontWeight: "500", marginBottom: "16px" }}>
+              🔴 Conversation ended. Your transcript and recording have been compiled.
+            </p>
+          )}
           <p className="text-muted">
             Your conversation data is stored locally. Add your email to receive the
             plan summary and voice recording, then close the session when done.
@@ -159,37 +168,33 @@ export default function ConversationView({
             )}
           </div>
 
-          <button className="btn-back" onClick={() => { setMode("conversation"); setConfirmClose(false); }}>
-            Back to conversation
-          </button>
+          {connected && (
+            <button className="btn-back" onClick={() => { setMode("conversation"); setConfirmClose(false); }}>
+              Back to conversation
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="conversation">
-      <header className="conversation-header">
-        <div className="conversation-status">
-          <span className={`status-dot ${agentSpeaking ? "speaking" : ""}`} />
-          {agentSpeaking ? (
-            <div className="speaking-indicator">
-              <span className="speaking-label">Assistant is speaking</span>
-              <div className="waveform">
-                <span className="waveform-bar" />
-                <span className="waveform-bar" />
-                <span className="waveform-bar" />
-                <span className="waveform-bar" />
-                <span className="waveform-bar" />
-              </div>
-            </div>
-          ) : (
-            <span>Assistant is listening...</span>
-          )}
+    <div className="conversation-dashboard">
+      <header className="dashboard-header">
+        <div className="brand">
+          <div className="brand-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </div>
+          <div className="brand-meta">
+            <h1>Advanced Care Planning</h1>
+            <span className="session-tag">Live Session</span>
+          </div>
         </div>
         <div className="header-actions">
           <button className="btn-plan" onClick={() => setMode("plan")}>
-            Session Plan
+            Session Summary & Actions
           </button>
           <button className="btn-end" onClick={onDisconnect}>
             End Conversation
@@ -197,28 +202,63 @@ export default function ConversationView({
         </div>
       </header>
 
-      {/* ACP Sections — main page content */}
-      <div className="acp-sections">
-        <PreferencesView preferences={preferences} />
-      </div>
+      <div className="dashboard-content">
+        {/* Left column: Voice Status & Live Transcript */}
+        <div className="dashboard-left">
+          <div className="voice-hub-card">
+            <div className="status-indicator-bar">
+              <span className={`status-dot ${agentSpeaking ? "speaking" : ""}`} />
+              {agentSpeaking ? (
+                <div className="speaking-indicator">
+                  <span className="speaking-label">Assistant is speaking</span>
+                  <div className="waveform">
+                    <span className="waveform-bar" />
+                    <span className="waveform-bar" />
+                    <span className="waveform-bar" />
+                    <span className="waveform-bar" />
+                    <span className="waveform-bar" />
+                  </div>
+                </div>
+              ) : (
+                <span className="listening-label">Assistant is listening...</span>
+              )}
+            </div>
+            
+            <div className="transcript-wrapper">
+              <TranscriptPanel messages={transcript} agentSpeaking={agentSpeaking} />
+            </div>
 
-      <footer className="conversation-footer">
-        <div className="mic-indicator">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <rect x="9" y="2" width="6" height="11" rx="3" />
-            <path d="M5 10a7 7 0 0 0 14 0" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
-          <span>Mic active — speak freely</span>
+            <div className="voice-hub-footer">
+              <div className="mic-indicator">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <rect x="9" y="2" width="6" height="11" rx="3" />
+                  <path d="M5 10a7 7 0 0 0 14 0" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+                <span>Mic active — speak freely</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </footer>
+
+        {/* Right column: Live Preferences Cards */}
+        <div className="dashboard-right">
+          <div className="preferences-hub-header">
+            <h2>Care Plan Preferences</h2>
+            <p>Topics populate automatically as they are discussed during the conversation.</p>
+          </div>
+          <div className="preferences-grid-container">
+            <PreferencesView preferences={preferences} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
