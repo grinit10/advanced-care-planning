@@ -9,11 +9,17 @@ Imagine a situation where you become seriously ill or injured, and you cannot sp
 * **Advanced Care Planning (ACP)** is the process of thinking about, discussing, and planning for your future health and personal care.
 * It ensures your values, beliefs, and treatment preferences are known so they can guide your family and healthcare team if you cannot communicate.
 
+[![What is Advanced Care Planning?](https://img.youtube.com/vi/ClvlOLQUl34/maxresdefault.jpg)](https://youtu.be/ClvlOLQUl34)
+*Watch this short introduction video explaining the importance and process of Advanced Care Planning.*
+
 ### 🎯 Purpose of This Solution
 Documenting future wishes can feel intimidating, clinical, or emotionally overwhelming. This solution provides a **friendly, natural voice assistant** that:
 1. **Guides the Conversation**: Gently walks a patient through key topics (substitute decision-makers, treatment preferences, quality of life thresholds, and faith/cultural values) in a conversational, non-threatening way.
-2. **Generates an Actionable Plan**: Dynamically extracts preferences in the background to build a structured summary and downloadable Word document (`.docx`) of their wishes.
-3. **Protects Patient Dignity & Privacy**: Designed specifically for clinical tablets on-site, ensuring zero data is persisted locally and all information is vanished once the session ends.
+2. **Generates an Actionable Plan**: Dynamically extracts preferences in the background to build a structured summary and downloadable Word document (`.docx`) of wishes.
+3. **Clinical EMR Integration (FHIR)**: Supports exporting structured plans directly to the **HL7/FHIR `QuestionnaireResponse`** format, enabling hospitals to ingest patient wishes directly into EMR systems like Epic or Cerner.
+4. **Calming Audio Visualizer & Progress Tracker**: Features a premium canvas-based sinusoidal visualizer and a real-time progress tracker showing how many ACP topics have been successfully discussed.
+5. **Zero-Friction Network Setup**: Auto-detects network LAN IPs and dynamically resolves local port conflicts (e.g. if port `5173` is busy) on startup.
+6. **Protects Patient Dignity & Privacy**: Designed specifically for clinical tablets on-site, ensuring zero data is persisted locally and all information is vaporized once the session ends.
 
 ---
 
@@ -164,6 +170,9 @@ bash scripts/setup.sh
 3. Type your name in the box.
 4. Click **"Start Conversation"** and allow microphone access.
 5. **Start speaking!** The AI will guide you through your care planning.
+
+[![How to Use the UI](https://img.youtube.com/vi/QMd7MrDQtds/maxresdefault.jpg)](https://youtu.be/QMd7MrDQtds)
+*Watch this tutorial video to see how to use the UI and interact with the Voice AI Assistant.*
 
 ---
 

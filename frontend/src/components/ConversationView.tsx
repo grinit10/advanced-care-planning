@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { TranscriptMessage } from "../hooks/useVoiceAgent";
 import TranscriptPanel from "./TranscriptPanel";
+import AudioVisualizer from "./AudioVisualizer";
 
 const AGENT_API_URL = import.meta.env.VITE_AGENT_API_URL ?? "http://localhost:8082";
 
@@ -75,6 +76,11 @@ export default function ConversationView({
   const handleDownloadPlan = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     window.open(`${AGENT_API_URL}/plan-docx/${encodeURIComponent(roomId)}`, "_blank");
+  };
+
+  const handleDownloadFhir = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    window.open(`${AGENT_API_URL}/fhir-export/${encodeURIComponent(roomId)}`, "_blank");
   };
 
   if (mode === "plan" || !connected) {
@@ -156,6 +162,9 @@ export default function ConversationView({
               <a className="btn-download" href="#" onClick={handleDownloadPlan}>
                 Download Plan (.docx)
               </a>
+              <a className="btn-download" href="#" onClick={handleDownloadFhir}>
+                Export FHIR (JSON)
+              </a>
             </div>
           </div>
 
@@ -228,19 +237,15 @@ export default function ConversationView({
             <div className="status-indicator-bar">
               <span className={`status-dot ${agentSpeaking ? "speaking" : ""}`} />
               {agentSpeaking ? (
-                <div className="speaking-indicator">
-                  <span className="speaking-label">Assistant is speaking</span>
-                  <div className="waveform">
-                    <span className="waveform-bar" />
-                    <span className="waveform-bar" />
-                    <span className="waveform-bar" />
-                    <span className="waveform-bar" />
-                    <span className="waveform-bar" />
-                  </div>
-                </div>
+                <span className="speaking-label">Assistant is speaking</span>
               ) : (
                 <span className="listening-label">Assistant is listening...</span>
               )}
+            </div>
+
+            {/* Real-time Audio Visualizer */}
+            <div className="visualizer-container" style={{ padding: "0.5rem 1rem", borderBottom: "1px solid var(--color-border-soft)" }}>
+              <AudioVisualizer isSpeaking={agentSpeaking} isConnected={connected} />
             </div>
 
             <div className="transcript-wrapper">
@@ -270,8 +275,34 @@ export default function ConversationView({
         {/* Right column: Live Preferences Cards */}
         <div className="dashboard-right">
           <div className="preferences-hub-header">
-            <h2>Care Plan Preferences</h2>
-            <p>Topics populate automatically as they are discussed during the conversation.</p>
+            {(() => {
+              const sectionsKeys = [
+                "substitute_decision_maker",
+                "quality_of_life",
+                "treatment_preferences",
+                "personal_beliefs",
+                "specific_scenarios",
+                "dignity_and_values",
+              ];
+              const discussedCount = sectionsKeys.filter(
+                (key) => (preferences[key] as Record<string, unknown> | undefined)?.discussed === true
+              ).length;
+              const progressPercent = Math.round((discussedCount / sectionsKeys.length) * 100);
+              return (
+                <div className="pref-header-top">
+                  <div>
+                    <h2>Care Plan Preferences</h2>
+                    <p className="text-muted">Topics populate automatically as they are discussed during the conversation.</p>
+                  </div>
+                  <div className="progress-badge">
+                    <span className="progress-text">{discussedCount} of {sectionsKeys.length} Topics</span>
+                    <div className="progress-bar-track">
+                      <div className="progress-bar-fill" style={{ width: `${progressPercent}%` }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
           <div className="preferences-grid-container">
             <PreferencesView preferences={preferences} />

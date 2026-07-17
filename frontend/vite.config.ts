@@ -13,7 +13,7 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: parseInt(process.env.FRONTEND_PORT || "5173", 10),
   },
   test: {
     globals: true,

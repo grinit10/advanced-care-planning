@@ -42,4 +42,9 @@ spec:
                 secretKeyRef:
                   name: {{ include "acp.fullname" . }}-deepgram-key
                   key: apiKey
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acp.fullname" . }}-groq-key
+                  key: apiKey
           resources: {{ toYaml .Values.agent.resources | nindent 12 }}
