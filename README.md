@@ -9,6 +9,9 @@ Imagine a situation where you become seriously ill or injured, and you cannot sp
 * **Advanced Care Planning (ACP)** is the process of thinking about, discussing, and planning for your future health and personal care.
 * It ensures your values, beliefs, and treatment preferences are known so they can guide your family and healthcare team if you cannot communicate.
 
+[![What is Advanced Care Planning?](https://img.youtube.com/vi/ClvlOLQUl34/maxresdefault.jpg)](https://youtu.be/ClvlOLQUl34)
+*Watch this short introduction video explaining the importance and process of Advanced Care Planning.*
+
 ### 🎯 Purpose of This Solution
 Documenting future wishes can feel intimidating, clinical, or emotionally overwhelming. This solution provides a **friendly, natural voice assistant** that:
 1. **Guides the Conversation**: Gently walks a patient through key topics (substitute decision-makers, treatment preferences, quality of life thresholds, and faith/cultural values) in a conversational, non-threatening way.
@@ -167,6 +170,9 @@ bash scripts/setup.sh
 3. Type your name in the box.
 4. Click **"Start Conversation"** and allow microphone access.
 5. **Start speaking!** The AI will guide you through your care planning.
+
+[![How to Use the UI](https://img.youtube.com/vi/QMd7MrDQtds/maxresdefault.jpg)](https://youtu.be/QMd7MrDQtds)
+*Watch this tutorial video to see how to use the UI and interact with the Voice AI Assistant.*
 
 ---
 
