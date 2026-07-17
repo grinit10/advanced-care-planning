@@ -73,6 +73,7 @@ async def correlation_id_middleware(request: web.Request, handler):
     response.headers["X-Correlation-ID"] = corr_id
     return response
 
+
 # Parse CORS allowed origins from environment (comma-separated list, e.g. "http://localhost:5173,https://acp.yourdomain.com")
 # Defaults to "*" if not defined.
 _ALLOWED_CORS_ORIGINS = [
@@ -626,14 +627,20 @@ async def handle_get_fhir_json(request: web.Request) -> web.Response:
     preferences = await store.get_preferences_json(room_id)
     if not preferences:
         log_audit_event("export_fhir", room_id, request, success=False)
-        return web.json_response({"error": "No preferences available to export"}, status=404)
+        return web.json_response(
+            {"error": "No preferences available to export"}, status=404
+        )
 
     log_audit_event("export_fhir", room_id, request, success=True)
 
     # Get participant name if available
     metadata = await store._r.hgetall(store._key(room_id, "metadata"))
     raw_patient_name = metadata.get("participant_identity", "Anonymous Patient")
-    patient_name = raw_patient_name.decode("utf-8") if isinstance(raw_patient_name, bytes) else str(raw_patient_name)
+    patient_name = (
+        raw_patient_name.decode("utf-8")
+        if isinstance(raw_patient_name, bytes)
+        else str(raw_patient_name)
+    )
 
     fhir_data = to_fhir_questionnaire_response(preferences, patient_name=patient_name)
 
@@ -784,7 +791,13 @@ async def handle_send_plan(request: web.Request) -> web.Response:
         success_count,
         len(results),
     )
-    log_audit_event("send_plan_email", room_id, request, success=success_count > 0, metadata={"emails": emails})
+    log_audit_event(
+        "send_plan_email",
+        room_id,
+        request,
+        success=success_count > 0,
+        metadata={"emails": emails},
+    )
 
     return web.json_response(
         {

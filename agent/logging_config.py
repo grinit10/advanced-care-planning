@@ -7,11 +7,13 @@ from typing import Any
 # Thread-local / async task correlation ID tracker
 CORRELATION_ID_VAR = ContextVar("correlation_id", default="")
 
+
 class StructuredJSONFormatter(logging.Formatter):
     """Log formatter that outputs log lines as parseable JSON objects.
 
     Automatically injects the current correlation ID if present in the async context.
     """
+
     def format(self, record):
         log_entry: dict[str, Any] = {
             "timestamp": self.formatTime(record, self.datefmt),
@@ -25,16 +27,35 @@ class StructuredJSONFormatter(logging.Formatter):
 
         # Standard attributes of LogRecord to exclude from the custom extra payload
         std_fields = {
-            'args', 'asctime', 'created', 'exc_info', 'exc_text', 'filename',
-            'funcName', 'levelname', 'levelno', 'lineno', 'module', 'msecs',
-            'message', 'msg', 'name', 'pathname', 'process', 'processName',
-            'relativeCreated', 'stack_info', 'thread', 'threadName'
+            "args",
+            "asctime",
+            "created",
+            "exc_info",
+            "exc_text",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "module",
+            "msecs",
+            "message",
+            "msg",
+            "name",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "thread",
+            "threadName",
         }
         extra = {k: v for k, v in record.__dict__.items() if k not in std_fields}
         if extra:
             log_entry["extra"] = extra
 
         return json.dumps(log_entry)
+
 
 def setup_logging():
     """Initialise global logging formatter based on the LOG_FORMAT env var."""

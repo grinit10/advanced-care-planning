@@ -253,10 +253,7 @@ def to_fhir_questionnaire_response(
                         "linkId": "sdm_relationship",
                         "text": "Relationship",
                         "answer": [
-                            {
-                                "valueString": sdm.get("relationship")
-                                or "Not provided"
-                            }
+                            {"valueString": sdm.get("relationship") or "Not provided"}
                         ],
                     },
                     {
@@ -367,17 +364,14 @@ def to_fhir_questionnaire_response(
                         "linkId": "pb_faith_role",
                         "text": "Role of Faith/Spirituality",
                         "answer": [
-                            {
-                                "valueString": pb.get("faith_role") or "Not discussed"
-                            }
+                            {"valueString": pb.get("faith_role") or "Not discussed"}
                         ],
                     },
                     {
                         "linkId": "pb_cultural_values",
                         "text": "Cultural Values",
                         "answer": [
-                            {
-                                "valueString": val}
+                            {"valueString": val}
                             for val in pb.get("cultural_values", [])
                             if val
                         ],
@@ -442,8 +436,7 @@ def to_fhir_questionnaire_response(
                         "linkId": "dv_meaning_of_life",
                         "text": "What Gives Life Meaning",
                         "answer": [
-                            {
-                                "valueString": val}
+                            {"valueString": val}
                             for val in dv.get("meaning_of_life", [])
                             if val
                         ],
@@ -468,4 +461,3 @@ def to_fhir_questionnaire_response(
         )
 
     return fhir_response
-

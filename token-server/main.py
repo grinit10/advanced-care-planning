@@ -10,11 +10,13 @@ from livekit import api
 # Thread-local / async task correlation ID tracker
 CORRELATION_ID_VAR = ContextVar("correlation_id", default="")
 
+
 class StructuredJSONFormatter(logging.Formatter):
     """Log formatter that outputs log lines as parseable JSON objects.
 
     Automatically injects the current correlation ID if present in the async context.
     """
+
     def format(self, record):
         log_entry = {
             "timestamp": self.formatTime(record, self.datefmt),
@@ -26,6 +28,7 @@ class StructuredJSONFormatter(logging.Formatter):
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
         return json.dumps(log_entry)
+
 
 def setup_logging():
     """Initialise global logging formatter based on the LOG_FORMAT env var."""
@@ -59,6 +62,7 @@ async def correlation_id_middleware(request: web.Request, handler):
     response = await handler(request)
     response.headers["X-Correlation-ID"] = corr_id
     return response
+
 
 # Parse CORS allowed origins from environment (comma-separated list, e.g. "http://localhost:5173,https://acp.yourdomain.com")
 # Defaults to "*" if not defined.
