@@ -45,6 +45,8 @@ Documenting future wishes can feel intimidating, clinical, or emotionally overwh
 |------------|-----------------|
 | **Docker Desktop** (free) | https://www.docker.com/products/docker-desktop/ |
 | **Azure account** (free) | https://portal.azure.com (get $200 AUD free credits) |
+| **Deepgram account** (free) | https://console.deepgram.com (includes 200 free minutes/month) |
+| **Groq account** (free) | https://console.groq.com |
 | **A microphone** | Built into most laptops |
 
 **That's it. No Python. No Node.js. No coding.**
@@ -85,7 +87,7 @@ You need an Azure OpenAI resource with 1 model deployed. Follow these steps:
 #### 2c. Copy Your Keys
 1. Go back to the Azure portal tab.
 2. On the left menu, click **"Keys and Endpoint"**.
-3. Copy **Key 1** and the **Endpoint** URL.
+3. Copy **Key 1** and the **Endpoint** URL (e.g. `https://acp-openai.openai.azure.com`).
 
 ---
 
@@ -117,12 +119,25 @@ cd advanced-care-planning
 #### Create the .env File
 1. In the project folder, make a copy of **`.env.example`** and rename it to **`.env`**.
 2. Open the `.env` file in **Notepad** (or any editor).
-3. Replace the values with the API keys you copied in the steps above:
-   - `AZURE_OPENAI_ENDPOINT`
-   - `AZURE_OPENAI_API_KEY`
-   - `GROQ_API_KEY`
-   - `DEEPGRAM_API_KEY`
-4. **Save the file** and close it.
+3. The `.env` template looks like this:
+   ```ini
+   AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
+   AZURE_OPENAI_API_KEY=your-api-key-here
+   AZURE_OPENAI_API_VERSION=2024-10-01-preview
+   AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT=gpt-4o-mini
+   GROQ_API_KEY=your-groq-api-key-here
+   GROQ_VOICE_MODEL=llama-3.1-8b-instant
+   DEEPGRAM_API_KEY=your-deepgram-api-key-here
+   LIVEKIT_API_KEY=devkey
+   LIVEKIT_API_SECRET=devsecret
+   ACS_SENDER_DOMAIN=DoNotReply@abc123.azurecomm.net
+   ```
+4. Replace the placeholders with your actual keys and endpoints:
+   - `AZURE_OPENAI_ENDPOINT` -> Your Azure Endpoint URL
+   - `AZURE_OPENAI_API_KEY` -> Your Azure Key 1
+   - `GROQ_API_KEY` -> Your Groq API Key
+   - `DEEPGRAM_API_KEY` -> Your Deepgram API Key
+5. **Save the file** and close it.
 
 ---
 
