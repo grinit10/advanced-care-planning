@@ -33,6 +33,7 @@ from livekit.agents import (
 )
 from livekit.agents.tts import StreamAdapter
 from livekit.agents.voice import Agent, AgentSession
+from logging_config import setup_logging
 from preference_extractor import EMPTY_PREFERENCES, extract_preferences
 from session_store import SessionStore, TranscriptEntry
 
@@ -295,10 +296,8 @@ async def _start_background_services():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    )
+    # Initialize unified logging configuration
+    setup_logging()
 
     # ── Architecture Note ──────────────────────────────────────────────────
     # The LiveKit Agent SDK's cli.run_app() is a blocking call that manages

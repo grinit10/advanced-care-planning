@@ -19,6 +19,7 @@ import io
 import json
 import logging
 import os
+import uuid
 
 import docx
 from aiohttp import web
@@ -26,24 +27,91 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
 from email_sender import is_configured as email_configured
 from email_sender import send_plan_email
+from logging_config import CORRELATION_ID_VAR
 from preference_extractor import to_fhir_questionnaire_response
 from session_store import SessionStore
 
-# CORS headers — allow the frontend dev server to call this API
-_CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-}
+# Audit logger for tracking HIPAA compliance
+audit_logger = logging.getLogger("acp-agent.audit")
+
+
+def log_audit_event(
+    action: str,
+    room_id: str,
+    request: web.Request,
+    success: bool = True,
+    metadata: dict | None = None,
+):
+    """Log structured access and action auditing records."""
+    client_ip = request.headers.get("X-Forwarded-For", request.remote or "unknown")
+    user_agent = request.headers.get("User-Agent", "unknown")
+
+    event_data = {
+        "audit": True,
+        "action": action,
+        "room_id": room_id,
+        "client_ip": client_ip,
+        "user_agent": user_agent,
+        "success": success,
+    }
+    if metadata:
+        event_data.update(metadata)
+
+    audit_logger.info(
+        f"Audit Event: {action} on room {room_id} - Client: {client_ip} - Success: {success}",
+        extra=event_data,
+    )
+
+
+@web.middleware
+async def correlation_id_middleware(request: web.Request, handler):
+    """Extract or generate a unique correlation ID for request tracing."""
+    corr_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+    CORRELATION_ID_VAR.set(corr_id)
+
+    response = await handler(request)
+    response.headers["X-Correlation-ID"] = corr_id
+    return response
+
+# Parse CORS allowed origins from environment (comma-separated list, e.g. "http://localhost:5173,https://acp.yourdomain.com")
+# Defaults to "*" if not defined.
+_ALLOWED_CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_CORS_ORIGINS", "*").split(",")
+    if origin.strip()
+]
 
 
 @web.middleware
 async def cors_middleware(request: web.Request, handler):
     """Add CORS headers to every response, and handle OPTIONS preflight."""
+    origin = request.headers.get("Origin")
+
+    allowed_origin = None
+    if origin:
+        if "*" in _ALLOWED_CORS_ORIGINS or origin in _ALLOWED_CORS_ORIGINS:
+            allowed_origin = origin
+    else:
+        if "*" in _ALLOWED_CORS_ORIGINS:
+            allowed_origin = "*"
+
+    # If Origin header is present but not whitelisted, return 403 for OPTIONS, or omit CORS headers
+    if origin and not allowed_origin:
+        if request.method == "OPTIONS":
+            return web.Response(status=403, text="CORS Origin Not Allowed")
+        return await handler(request)
+
+    headers = {
+        "Access-Control-Allow-Origin": allowed_origin or "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    }
+
     if request.method == "OPTIONS":
-        return web.Response(headers=_CORS_HEADERS)
+        return web.Response(headers=headers)
+
     resp = await handler(request)
-    for key, val in _CORS_HEADERS.items():
+    for key, val in headers.items():
         resp.headers[key] = val
     return resp
 
@@ -229,6 +297,7 @@ async def handle_events(request: web.Request) -> web.StreamResponse:
     the browser's EventSource API auto-reconnects if dropped.
     """
     room_id = request.match_info["room_id"]
+    log_audit_event("connect_event_stream", room_id, request)
     store = await _get_store()
 
     response = web.StreamResponse(
@@ -301,8 +370,10 @@ async def handle_get_recording(request: web.Request) -> web.FileResponse | web.R
     audio_path = await store.get_audio_path(room_id)
 
     if not audio_path or not os.path.exists(audio_path):
+        log_audit_event("download_recording", room_id, request, success=False)
         return web.json_response({"error": "Recording not available"}, status=404)
 
+    log_audit_event("download_recording", room_id, request, success=True)
     filename = f"acp-conversation-{room_id}.wav"
     return web.FileResponse(
         path=audio_path,
@@ -320,8 +391,10 @@ async def handle_get_transcript_download(request: web.Request) -> web.Response:
     transcript = await store.get_transcript(room_id)
 
     if not transcript:
+        log_audit_event("download_transcript", room_id, request, success=False)
         return web.json_response({"error": "Transcript not available"}, status=404)
 
+    log_audit_event("download_transcript", room_id, request, success=True)
     lines = []
     for entry in transcript:
         role = "You" if entry.get("role") == "user" else "Assistant"
@@ -351,6 +424,8 @@ async def handle_get_plan_docx(request: web.Request) -> web.Response:
     if not summary:
         summary = await _generate_summary(room_id)
         await store.set_plan_summary(room_id, summary)
+
+    log_audit_event("download_plan_docx", room_id, request, success=True)
 
     doc = docx.Document()
 
@@ -550,11 +625,15 @@ async def handle_get_fhir_json(request: web.Request) -> web.Response:
 
     preferences = await store.get_preferences_json(room_id)
     if not preferences:
+        log_audit_event("export_fhir", room_id, request, success=False)
         return web.json_response({"error": "No preferences available to export"}, status=404)
+
+    log_audit_event("export_fhir", room_id, request, success=True)
 
     # Get participant name if available
     metadata = await store._r.hgetall(store._key(room_id, "metadata"))
-    patient_name = metadata.get("participant_identity", "Anonymous Patient")
+    raw_patient_name = metadata.get("participant_identity", "Anonymous Patient")
+    patient_name = raw_patient_name.decode("utf-8") if isinstance(raw_patient_name, bytes) else str(raw_patient_name)
 
     fhir_data = to_fhir_questionnaire_response(preferences, patient_name=patient_name)
 
@@ -572,6 +651,7 @@ async def handle_get_transcript_json(request: web.Request) -> web.Response:
     room_id = request.match_info["room_id"]
     store = await _get_store()
     transcript = await store.get_transcript(room_id)
+    log_audit_event("fetch_transcript_json", room_id, request)
     return web.json_response(
         {
             "room_id": room_id,
@@ -585,6 +665,7 @@ async def handle_get_preferences(request: web.Request) -> web.Response:
     room_id = request.match_info["room_id"]
     store = await _get_store()
     prefs = await store.get_preferences_json(room_id)
+    log_audit_event("fetch_preferences", room_id, request)
     return web.json_response(
         {
             "room_id": room_id,
@@ -598,6 +679,7 @@ async def handle_get_plan(request: web.Request) -> web.Response:
     store = await _get_store()
     status = await store.get_status(room_id)
 
+    log_audit_event("fetch_plan", room_id, request, success=status is not None)
     if not status:
         return web.json_response({"error": "Session not found"}, status=404)
 
@@ -637,6 +719,7 @@ async def handle_add_email(request: web.Request) -> web.Response:
     await store.add_email(room_id, email)
     email_count = len(await store.get_emails(room_id))
     logger.info("Email added for session %s: %s", room_id, email)
+    log_audit_event("register_email", room_id, request, metadata={"email": email})
 
     return web.json_response(
         {
@@ -701,6 +784,7 @@ async def handle_send_plan(request: web.Request) -> web.Response:
         success_count,
         len(results),
     )
+    log_audit_event("send_plan_email", room_id, request, success=success_count > 0, metadata={"emails": emails})
 
     return web.json_response(
         {
@@ -747,6 +831,7 @@ async def handle_close(request: web.Request) -> web.Response:
 
     # Close session and delete Redis data
     data = await store.close_session(room_id)
+    log_audit_event("close_session", room_id, request)
 
     # Delete audio file
     if audio_path:
@@ -776,7 +861,7 @@ async def handle_close(request: web.Request) -> web.Response:
 
 def create_app() -> web.Application:
     """Create the aiohttp application."""
-    app = web.Application(middlewares=[cors_middleware])
+    app = web.Application(middlewares=[correlation_id_middleware, cors_middleware])
     app.router.add_get("/health", handle_health)
     app.router.add_get("/events/{room_id}", handle_events)
     app.router.add_get("/preferences/{room_id}", handle_get_preferences)

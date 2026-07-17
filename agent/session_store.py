@@ -19,6 +19,7 @@ Key schema:
 
 import json
 import logging
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from typing import cast
@@ -42,6 +43,11 @@ class SessionStore:
         self.redis_url = redis_url
         self._redis: aioredis.Redis | None = None
         self._prefix = "session"
+        self.ttl = int(os.environ.get("SESSION_TTL", "86400"))
+
+    async def _expire(self, key: str):
+        """Set expiration TTL on the given key."""
+        await self._r.expire(key, self.ttl)
 
     async def connect(self):
         """Connect to Redis."""
@@ -66,7 +72,9 @@ class SessionStore:
     # --- Status ---
 
     async def set_status(self, room_id: str, status: str):
-        await self._r.set(self._key(room_id, "status"), status)
+        key = self._key(room_id, "status")
+        await self._r.set(key, status)
+        await self._expire(key)
 
     async def get_status(self, room_id: str) -> str | None:
         return cast("str | None", await self._r.get(self._key(room_id, "status")))
@@ -74,7 +82,9 @@ class SessionStore:
     # --- Metadata ---
 
     async def save_metadata(self, room_id: str, **kwargs):
-        await self._r.hset(self._key(room_id, "metadata"), mapping=kwargs)  # type: ignore[arg-type]
+        key = self._key(room_id, "metadata")
+        await self._r.hset(key, mapping=kwargs)  # type: ignore[arg-type]
+        await self._expire(key)
 
     # --- Transcript ---
 
@@ -84,6 +94,7 @@ class SessionStore:
         await self._r.rpush(key, json.dumps(asdict(entry)))
         # Keep only last 500 entries per session
         await self._r.ltrim(key, -500, -1)
+        await self._expire(key)
 
     async def get_transcript(self, room_id: str) -> list[dict]:
         """Get full transcript for a session."""
@@ -95,7 +106,9 @@ class SessionStore:
 
     async def set_preference(self, room_id: str, key: str, value: str):
         """Set a single preference key-value pair (flat string storage)."""
-        await self._r.hset(self._key(room_id, "preferences"), key, value)
+        pref_key = self._key(room_id, "preferences")
+        await self._r.hset(pref_key, key, value)
+        await self._expire(pref_key)
 
     async def get_preferences(self, room_id: str) -> dict:
         """Get all preferences. Returns a flat dict from Redis."""
@@ -116,15 +129,19 @@ class SessionStore:
 
     async def save_preferences_json(self, room_id: str, prefs: dict):
         """Save the full nested preferences JSON object (replaces entirely)."""
+        key = self._key(room_id, "preferences_json")
         await self._r.set(
-            self._key(room_id, "preferences_json"),
+            key,
             json.dumps(prefs, default=str),
         )
+        await self._expire(key)
 
     # --- Emails ---
 
     async def add_email(self, room_id: str, email: str):
-        await self._r.sadd(self._key(room_id, "emails"), email.lower())
+        key = self._key(room_id, "emails")
+        await self._r.sadd(key, email.lower())
+        await self._expire(key)
 
     async def get_emails(self, room_id: str) -> list[str]:
         raw = await self._r.smembers(self._key(room_id, "emails"))
@@ -133,7 +150,9 @@ class SessionStore:
     # --- Audio ---
 
     async def set_audio_path(self, room_id: str, path: str):
-        await self._r.set(self._key(room_id, "audio_path"), path)
+        key = self._key(room_id, "audio_path")
+        await self._r.set(key, path)
+        await self._expire(key)
 
     async def get_audio_path(self, room_id: str) -> str | None:
         return cast("str | None", await self._r.get(self._key(room_id, "audio_path")))
@@ -141,7 +160,9 @@ class SessionStore:
     # --- Plan Summary ---
 
     async def set_plan_summary(self, room_id: str, summary: str):
-        await self._r.set(self._key(room_id, "plan_summary"), summary)
+        key = self._key(room_id, "plan_summary")
+        await self._r.set(key, summary)
+        await self._expire(key)
 
     async def get_plan_summary(self, room_id: str) -> str | None:
         return cast("str | None", await self._r.get(self._key(room_id, "plan_summary")))

@@ -9,3 +9,4 @@ data:
   AZURE_OPENAI_API_VERSION: "{{ .Values.azure.openai.apiVersion }}"
   AZURE_OPENAI_LLM_DEPLOYMENT: "{{ .Values.azure.openai.deployments.llm }}"
   DEEPGRAM_BASE_URL: "https://api.au.deepgram.com"
+  GROQ_VOICE_MODEL: "{{ .Values.groq.voiceModel }}"
