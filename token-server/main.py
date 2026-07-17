@@ -22,6 +22,7 @@ async def cors_middleware(request: web.Request, handler):
         resp.headers[key] = val
     return resp
 
+
 logger = logging.getLogger("token-server")
 
 # Load credentials from environment
@@ -39,12 +40,17 @@ async def handle_token(request: web.Request) -> web.Response:
             status=400,
         )
 
-    token = api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET) \
-        .with_identity(identity) \
-        .with_grants(api.VideoGrants(
-            room_join=True,
-            room=room_name,
-        )).to_jwt()
+    token = (
+        api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+        .with_identity(identity)
+        .with_grants(
+            api.VideoGrants(
+                room_join=True,
+                room=room_name,
+            )
+        )
+        .to_jwt()
+    )
 
     logger.info(f"Token generated: room={room_name}, identity={identity}")
     return web.json_response({"token": token})

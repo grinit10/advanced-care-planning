@@ -10,7 +10,9 @@ from livekit.plugins import deepgram, groq, openai, silero
 AZURE_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
 AZURE_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")
 AZURE_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
-AZURE_EXTRACTOR_LLM_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT", "")
+AZURE_EXTRACTOR_LLM_DEPLOYMENT = os.environ.get(
+    "AZURE_OPENAI_EXTRACTOR_LLM_DEPLOYMENT", ""
+)
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_VOICE_MODEL = os.environ.get("GROQ_VOICE_MODEL", "llama-3.1-8b-instant")
@@ -18,11 +20,12 @@ GROQ_VOICE_MODEL = os.environ.get("GROQ_VOICE_MODEL", "llama-3.1-8b-instant")
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 
 
-
 def create_voice_llm() -> groq.LLM:
     """Create an LLM instance for voice conversation using Groq (optimized for low-latency LPU inference)."""
     if not GROQ_API_KEY:
-        raise ValueError("GROQ_API_KEY is not configured in .env. Groq is required for the voice model.")
+        raise ValueError(
+            "GROQ_API_KEY is not configured in .env. Groq is required for the voice model."
+        )
     return groq.LLM(
         api_key=GROQ_API_KEY,
         model=GROQ_VOICE_MODEL,
@@ -39,7 +42,6 @@ def create_extractor_llm() -> openai.LLM:
         extra_query={"api-version": AZURE_API_VERSION},
         temperature=0.0,
     )
-
 
 
 def create_stt() -> deepgram.STT:

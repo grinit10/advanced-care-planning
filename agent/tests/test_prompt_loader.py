@@ -61,4 +61,3 @@ def test_load_prompt_with_invalid_yaml(tmp_path: Path):
     yaml_path.write_text(": : invalid yaml : :\n")
     with pytest.raises(yaml.YAMLError):
         load_prompt(str(yaml_path))
-

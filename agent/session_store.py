@@ -44,9 +44,7 @@ class SessionStore:
 
     async def connect(self):
         """Connect to Redis."""
-        self._redis = aioredis.from_url(
-            self.redis_url, decode_responses=True
-        )
+        self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
         await self._redis.ping()
         logger.info("Connected to Redis session store")
 
@@ -89,9 +87,7 @@ class SessionStore:
 
     async def set_preference(self, room_id: str, key: str, value: str):
         """Set a single preference key-value pair (flat string storage)."""
-        await self._redis.hset(
-            self._key(room_id, "preferences"), key, value
-        )
+        await self._redis.hset(self._key(room_id, "preferences"), key, value)
 
     async def get_preferences(self, room_id: str) -> dict:
         """Get all preferences. Returns a flat dict from Redis."""
@@ -142,9 +138,7 @@ class SessionStore:
 
     # --- Session lifecycle ---
 
-    async def create_session(
-        self, room_id: str, participant_identity: str = ""
-    ):
+    async def create_session(self, room_id: str, participant_identity: str = ""):
         """Initialise a new session."""
         await self.set_status(room_id, "active")
         await self.save_metadata(
@@ -152,7 +146,9 @@ class SessionStore:
             created_at=str(time.time()),
             participant_identity=participant_identity,
         )
-        logger.info("Session created: room=%s participant=%s", room_id, participant_identity)
+        logger.info(
+            "Session created: room=%s participant=%s", room_id, participant_identity
+        )
 
     async def close_session(self, room_id: str) -> dict:
         """Close a session and return all data before deletion."""
@@ -163,17 +159,13 @@ class SessionStore:
         cursor = 0
         deleted = 0
         while True:
-            cursor, keys = await self._redis.scan(
-                cursor, match=pattern, count=100
-            )
+            cursor, keys = await self._redis.scan(cursor, match=pattern, count=100)
             if keys:
                 await self._redis.delete(*keys)
                 deleted += len(keys)
             if cursor == 0:
                 break
-        logger.info(
-            "Session closed: room=%s (%d keys deleted)", room_id, deleted
-        )
+        logger.info("Session closed: room=%s (%d keys deleted)", room_id, deleted)
         return data
 
     async def get_session_data(self, room_id: str) -> dict:

@@ -22,9 +22,21 @@ prompt: |
 def sample_transcript_entries() -> list[dict]:
     """Return sample transcript entries for testing."""
     return [
-        {"role": "agent", "text": "Hello, how can I help you today?", "timestamp": 1000.0},
-        {"role": "user", "text": "I want to talk about my healthcare wishes.", "timestamp": 1001.0},
-        {"role": "agent", "text": "That's wonderful. What matters most to you?", "timestamp": 1002.0},
+        {
+            "role": "agent",
+            "text": "Hello, how can I help you today?",
+            "timestamp": 1000.0,
+        },
+        {
+            "role": "user",
+            "text": "I want to talk about my healthcare wishes.",
+            "timestamp": 1001.0,
+        },
+        {
+            "role": "agent",
+            "text": "That's wonderful. What matters most to you?",
+            "timestamp": 1002.0,
+        },
     ]
 
 

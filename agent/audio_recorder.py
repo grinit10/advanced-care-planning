@@ -50,9 +50,7 @@ class ConversationRecorder:
         for _ in range(50):
             if not self._recording:
                 return
-            participant = self._room.remote_participants.get(
-                self._participant_identity
-            )
+            participant = self._room.remote_participants.get(self._participant_identity)
             if participant:
                 for pub in participant.track_publications.values():
                     if pub.kind == rtc.TrackKind.KIND_AUDIO and pub.track:
@@ -77,6 +75,7 @@ class ConversationRecorder:
 
     async def _read_all_streams(self):
         """Read audio frames from all subscribed streams concurrently."""
+
         async def read_one(stream: rtc.AudioStream):
             try:
                 async for event in stream:
@@ -127,7 +126,9 @@ class ConversationRecorder:
 
             file_size = os.path.getsize(filepath)
             logger.info(
-                "Saved recording: %s (%d bytes)", filepath, file_size,
+                "Saved recording: %s (%d bytes)",
+                filepath,
+                file_size,
             )
             return filepath
         except Exception as e:

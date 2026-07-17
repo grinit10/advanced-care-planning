@@ -52,7 +52,7 @@ class TestParseJsonResponse:
         assert result is None
 
     def test_extracts_json_from_surrounding_text(self):
-        text = "Here is the result: {\"key\": \"value\"}. Hope that helps."
+        text = 'Here is the result: {"key": "value"}. Hope that helps.'
         result = _parse_json_response(text)
         assert result == {"key": "value"}
 
@@ -125,7 +125,9 @@ class TestEmptyPreferences:
         for section, config in EMPTY_PREFERENCES.items():
             if isinstance(config, dict):
                 assert "discussed" in config, f"Missing 'discussed' in {section}"
-                assert config["discussed"] is False, f"'discussed' should be False in {section}"
+                assert config["discussed"] is False, (
+                    f"'discussed' should be False in {section}"
+                )
 
     def test_can_be_serialized_to_json(self):
         json_str = json.dumps(EMPTY_PREFERENCES)

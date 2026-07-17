@@ -46,6 +46,7 @@ async def cors_middleware(request: web.Request, handler):
         resp.headers[key] = val
     return resp
 
+
 logger = logging.getLogger("acp-agent.http")
 
 # Global reference set by the agent at startup
@@ -64,6 +65,7 @@ async def _get_store() -> SessionStore:
 
 
 # --- Helper: generate plan summary from pre-extracted preferences ---
+
 
 def _pref_value(val) -> str:
     """Format a preference value for display."""
@@ -211,6 +213,7 @@ async def _generate_summary(room_id: str) -> str:
 
 # --- Route handlers ---
 
+
 async def handle_health(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
 
@@ -248,30 +251,36 @@ async def handle_events(request: web.Request) -> web.Response:
         while True:
             # Check preferences
             prefs = await store.get_preferences_json(room_id)
-            prefs_hash = hashlib.sha256(
-                json.dumps(prefs, sort_keys=True, default=str).encode()
-            ).hexdigest() if prefs else ""
+            prefs_hash = (
+                hashlib.sha256(
+                    json.dumps(prefs, sort_keys=True, default=str).encode()
+                ).hexdigest()
+                if prefs
+                else ""
+            )
 
             if prefs_hash and prefs_hash != last_prefs_hash:
                 last_prefs_hash = prefs_hash
-                data = json.dumps({
-                    "type": "preferences",
-                    "preferences": prefs,
-                })
+                data = json.dumps(
+                    {
+                        "type": "preferences",
+                        "preferences": prefs,
+                    }
+                )
                 await response.write(f"event: preferences\ndata: {data}\n\n".encode())
 
             # Check plan summary
             summary = await store.get_plan_summary(room_id)
-            summary_hash = hashlib.sha256(
-                (summary or "").encode()
-            ).hexdigest()
+            summary_hash = hashlib.sha256((summary or "").encode()).hexdigest()
 
             if summary and summary_hash != last_summary_hash:
                 last_summary_hash = summary_hash
-                data = json.dumps({
-                    "type": "plan_summary",
-                    "summary": summary,
-                })
+                data = json.dumps(
+                    {
+                        "type": "plan_summary",
+                        "summary": summary,
+                    }
+                )
                 await response.write(f"event: plan_summary\ndata: {data}\n\n".encode())
 
             # Send keepalive comment every poll cycle
@@ -291,9 +300,7 @@ async def handle_get_recording(request: web.Request) -> web.Response:
     audio_path = await store.get_audio_path(room_id)
 
     if not audio_path or not os.path.exists(audio_path):
-        return web.json_response(
-            {"error": "Recording not available"}, status=404
-        )
+        return web.json_response({"error": "Recording not available"}, status=404)
 
     filename = f"acp-conversation-{room_id}.wav"
     return web.FileResponse(
@@ -312,9 +319,7 @@ async def handle_get_transcript_download(request: web.Request) -> web.Response:
     transcript = await store.get_transcript(room_id)
 
     if not transcript:
-        return web.json_response(
-            {"error": "Transcript not available"}, status=404
-        )
+        return web.json_response({"error": "Transcript not available"}, status=404)
 
     lines = []
     for entry in transcript:
@@ -354,7 +359,7 @@ async def handle_get_plan_docx(request: web.Request) -> web.Response:
     title_run.font.name = "Arial"
     title_run.font.size = Pt(22)
     title_run.font.bold = True
-    title_run.font.color.rgb = RGBColor(44, 95, 124) # #2c5f7c
+    title_run.font.color.rgb = RGBColor(44, 95, 124)  # #2c5f7c
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     # Overview
@@ -376,19 +381,58 @@ async def handle_get_plan_docx(request: web.Request) -> web.Response:
     hrun.font.color.rgb = RGBColor(51, 51, 51)
 
     sections = [
-        ("substitute_decision_maker", "Substitute Decision-Maker", [("name", "Who"), ("relationship", "Relationship")]),
-        ("quality_of_life", "Quality of Life", [("values", "What matters"), ("fears", "Concerns")]),
-        ("treatment_preferences", "Treatment Preferences", [("life_support", "Life support"), ("cpr", "CPR"), ("feeding_tubes", "Feeding tubes"), ("pain_management", "Pain management")]),
-        ("personal_beliefs", "Values & Beliefs", [("faith_role", "Faith/Spirituality"), ("cultural_values", "Cultural values")]),
-        ("specific_scenarios", "Specific Scenarios", [("dementia", "Dementia"), ("coma", "Coma"), ("terminal_illness", "Terminal illness")]),
-        ("dignity_and_values", "Dignity & Values", [("meaning_of_life", "What gives life meaning"), ("dignity_definition", "Definition of dignity")]),
+        (
+            "substitute_decision_maker",
+            "Substitute Decision-Maker",
+            [("name", "Who"), ("relationship", "Relationship")],
+        ),
+        (
+            "quality_of_life",
+            "Quality of Life",
+            [("values", "What matters"), ("fears", "Concerns")],
+        ),
+        (
+            "treatment_preferences",
+            "Treatment Preferences",
+            [
+                ("life_support", "Life support"),
+                ("cpr", "CPR"),
+                ("feeding_tubes", "Feeding tubes"),
+                ("pain_management", "Pain management"),
+            ],
+        ),
+        (
+            "personal_beliefs",
+            "Values & Beliefs",
+            [
+                ("faith_role", "Faith/Spirituality"),
+                ("cultural_values", "Cultural values"),
+            ],
+        ),
+        (
+            "specific_scenarios",
+            "Specific Scenarios",
+            [
+                ("dementia", "Dementia"),
+                ("coma", "Coma"),
+                ("terminal_illness", "Terminal illness"),
+            ],
+        ),
+        (
+            "dignity_and_values",
+            "Dignity & Values",
+            [
+                ("meaning_of_life", "What gives life meaning"),
+                ("dignity_definition", "Definition of dignity"),
+            ],
+        ),
     ]
 
     table = doc.add_table(rows=1, cols=2)
-    table.style = 'Light Shading Accent 1'
+    table.style = "Light Shading Accent 1"
     hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = 'Preference Category'
-    hdr_cells[1].text = 'Recorded Preference'
+    hdr_cells[0].text = "Preference Category"
+    hdr_cells[1].text = "Recorded Preference"
     for cell in hdr_cells:
         for paragraph in cell.paragraphs:
             for run in paragraph.runs:
@@ -467,13 +511,17 @@ async def handle_get_plan_docx(request: web.Request) -> web.Response:
     # Footer Disclaimer
     doc.add_paragraph()
     p = doc.add_paragraph()
-    p_run = p.add_run("Next Steps: Share these wishes with your substitute decision-maker, family, and GP. Formalise your Advance Care Directive through your state or territory's health department.")
+    p_run = p.add_run(
+        "Next Steps: Share these wishes with your substitute decision-maker, family, and GP. Formalise your Advance Care Directive through your state or territory's health department."
+    )
     p_run.font.name = "Arial"
     p_run.font.size = Pt(10)
     p_run.font.italic = True
 
     p2 = doc.add_paragraph()
-    p2_run = p2.add_run("This summary was generated by an AI assistant and should be reviewed by you and your healthcare provider before being formalised. It is not a legal document.")
+    p2_run = p2.add_run(
+        "This summary was generated by an AI assistant and should be reviewed by you and your healthcare provider before being formalised. It is not a legal document."
+    )
     p2_run.font.name = "Arial"
     p2_run.font.size = Pt(9)
     p2_run.font.italic = True
@@ -499,10 +547,12 @@ async def handle_get_transcript_json(request: web.Request) -> web.Response:
     room_id = request.match_info["room_id"]
     store = await _get_store()
     transcript = await store.get_transcript(room_id)
-    return web.json_response({
-        "room_id": room_id,
-        "transcript": transcript or [],
-    })
+    return web.json_response(
+        {
+            "room_id": room_id,
+            "transcript": transcript or [],
+        }
+    )
 
 
 async def handle_get_preferences(request: web.Request) -> web.Response:
@@ -510,10 +560,12 @@ async def handle_get_preferences(request: web.Request) -> web.Response:
     room_id = request.match_info["room_id"]
     store = await _get_store()
     prefs = await store.get_preferences_json(room_id)
-    return web.json_response({
-        "room_id": room_id,
-        "preferences": prefs if prefs else {},
-    })
+    return web.json_response(
+        {
+            "room_id": room_id,
+            "preferences": prefs if prefs else {},
+        }
+    )
 
 
 async def handle_get_plan(request: web.Request) -> web.Response:
@@ -522,9 +574,7 @@ async def handle_get_plan(request: web.Request) -> web.Response:
     status = await store.get_status(room_id)
 
     if not status:
-        return web.json_response(
-            {"error": "Session not found"}, status=404
-        )
+        return web.json_response({"error": "Session not found"}, status=404)
 
     transcript = await store.get_transcript(room_id)
     preferences = await store.get_preferences(room_id)
@@ -534,14 +584,16 @@ async def handle_get_plan(request: web.Request) -> web.Response:
         summary = await _generate_summary(room_id)
         await store.set_plan_summary(room_id, summary)
 
-    return web.json_response({
-        "room_id": room_id,
-        "status": status,
-        "summary": summary,
-        "preferences": preferences,
-        "transcript": transcript[-50:],  # last 50 entries
-        "email_count": len(await store.get_emails(room_id)),
-    })
+    return web.json_response(
+        {
+            "room_id": room_id,
+            "status": status,
+            "summary": summary,
+            "preferences": preferences,
+            "transcript": transcript[-50:],  # last 50 entries
+            "email_count": len(await store.get_emails(room_id)),
+        }
+    )
 
 
 async def handle_add_email(request: web.Request) -> web.Response:
@@ -555,20 +607,20 @@ async def handle_add_email(request: web.Request) -> web.Response:
 
     email = body.get("email", "").strip().lower()
     if not email or "@" not in email:
-        return web.json_response(
-            {"error": "Valid email address required"}, status=400
-        )
+        return web.json_response({"error": "Valid email address required"}, status=400)
 
     await store.add_email(room_id, email)
     email_count = len(await store.get_emails(room_id))
     logger.info("Email added for session %s: %s", room_id, email)
 
-    return web.json_response({
-        "status": "ok",
-        "email": email,
-        "email_count": email_count,
-        "message": "Email address registered. Click 'Send Plan' when you're ready.",
-    })
+    return web.json_response(
+        {
+            "status": "ok",
+            "email": email,
+            "email_count": email_count,
+            "message": "Email address registered. Click 'Send Plan' when you're ready.",
+        }
+    )
 
 
 async def handle_send_plan(request: web.Request) -> web.Response:
@@ -576,18 +628,24 @@ async def handle_send_plan(request: web.Request) -> web.Response:
     store = await _get_store()
 
     if not email_configured():
-        return web.json_response({
-            "error": (
-                "Email service not configured. "
-                "Set ACS_CONNECTION_STRING and ACS_SENDER_DOMAIN in .env"
-            ),
-        }, status=500)
+        return web.json_response(
+            {
+                "error": (
+                    "Email service not configured. "
+                    "Set ACS_CONNECTION_STRING and ACS_SENDER_DOMAIN in .env"
+                ),
+            },
+            status=500,
+        )
 
     emails = await store.get_emails(room_id)
     if not emails:
-        return web.json_response({
-            "error": "No email addresses registered. Add an email first.",
-        }, status=400)
+        return web.json_response(
+            {
+                "error": "No email addresses registered. Add an email first.",
+            },
+            status=400,
+        )
 
     # Get session data
     transcript = await store.get_transcript(room_id)
@@ -614,16 +672,18 @@ async def handle_send_plan(request: web.Request) -> web.Response:
     success_count = sum(1 for r in results if r["success"])
     logger.info(
         "Plan sent for session %s: %d/%d emails delivered",
-        room_id, success_count, len(results),
+        room_id,
+        success_count,
+        len(results),
     )
 
-    return web.json_response({
-        "status": "partial" if success_count < len(results) else "sent",
-        "results": results,
-        "message": (
-            f"Plan sent to {success_count} of {len(results)} email(s)."
-        ),
-    })
+    return web.json_response(
+        {
+            "status": "partial" if success_count < len(results) else "sent",
+            "results": results,
+            "message": (f"Plan sent to {success_count} of {len(results)} email(s)."),
+        }
+    )
 
 
 async def handle_close(request: web.Request) -> web.Response:
@@ -666,22 +726,28 @@ async def handle_close(request: web.Request) -> web.Response:
     # Delete audio file
     if audio_path:
         from audio_recorder import ConversationRecorder
+
         ConversationRecorder.cleanup(audio_path)
 
     transcript_count = len(data.get("transcript", []))
     logger.info(
         "Session closed: %s (%d transcript entries, audio deleted: %s)",
-        room_id, transcript_count, "yes" if audio_path else "no",
+        room_id,
+        transcript_count,
+        "yes" if audio_path else "no",
     )
 
-    return web.json_response({
-        "status": "closed",
-        "room_id": room_id,
-        "message": "Session closed. Your data has been deleted.",
-    })
+    return web.json_response(
+        {
+            "status": "closed",
+            "room_id": room_id,
+            "message": "Session closed. Your data has been deleted.",
+        }
+    )
 
 
 # --- App factory ---
+
 
 def create_app() -> web.Application:
     """Create the aiohttp application."""

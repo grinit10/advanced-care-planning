@@ -83,12 +83,15 @@ class ACPAgent(Agent):
             "what matters most to you. Shall we begin?"
         )
         # Log the first agent message
-        greeting_entry = TranscriptEntry(role="agent", text=(
-            "Hi, I'm your Advanced Care Planning assistant. "
-            "I'm here to help you think through and document your healthcare wishes "
-            "for the future. There are no right or wrong answers — this is about "
-            "what matters most to you. Shall we begin?"
-        ))
+        greeting_entry = TranscriptEntry(
+            role="agent",
+            text=(
+                "Hi, I'm your Advanced Care Planning assistant. "
+                "I'm here to help you think through and document your healthcare wishes "
+                "for the future. There are no right or wrong answers — this is about "
+                "what matters most to you. Shall we begin?"
+            ),
+        )
         await session_store.add_transcript_entry(self.room_id, greeting_entry)
         self.last_msg_count = len(self.chat_ctx.messages())
 
@@ -102,10 +105,7 @@ class ACPAgent(Agent):
         for i in range(self.last_msg_count, len(msgs)):
             # Extract text from content list (list[ChatContent] where text is str)
             content = msgs[i].content
-            text = " ".join(
-                c for c in (content or [])
-                if isinstance(c, str)
-            ) or ""
+            text = " ".join(c for c in (content or []) if isinstance(c, str)) or ""
             entry = TranscriptEntry(
                 role="user" if msgs[i].role == "user" else "agent",
                 text=text,
@@ -146,10 +146,10 @@ class ACPAgent(Agent):
                 exchange_parts = []
                 for msg in msgs[-4:]:  # last 2 turns (user + agent = 4 messages)
                     role = "User" if msg.role == "user" else "Assistant"
-                    text = " ".join(
-                        c for c in (msg.content or [])
-                        if isinstance(c, str)
-                    ) or ""
+                    text = (
+                        " ".join(c for c in (msg.content or []) if isinstance(c, str))
+                        or ""
+                    )
                     if text.strip():
                         exchange_parts.append(f"{role}: {text.strip()}")
 
@@ -319,6 +319,7 @@ if __name__ == "__main__":
         Uses asyncio.run() for clean event loop lifecycle management
         (creates, runs, and closes the loop automatically).
         """
+
         async def startup():
             await _start_background_services()
             await run_http_server()
@@ -331,7 +332,9 @@ if __name__ == "__main__":
         daemon=True,
     )
     http_thread.start()
-    logger.info("HTTP API server started on http://0.0.0.0:8082 (thread: %s)", http_thread.name)
+    logger.info(
+        "HTTP API server started on http://0.0.0.0:8082 (thread: %s)", http_thread.name
+    )
 
     # Start the LiveKit agent (blocking — takes over the main thread)
     cli.run_app(
