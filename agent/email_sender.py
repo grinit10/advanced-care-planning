@@ -16,12 +16,12 @@ To create an Azure Communication Services resource:
 import io
 import logging
 import os
+from typing import cast
 
 import docx
 from azure.communication.email import EmailClient, SendEmailResult
 from docx.shared import Pt, RGBColor
 from docx.styles.style import _ParagraphStyle
-from typing import cast
 
 logger = logging.getLogger("acp-agent.email")
 

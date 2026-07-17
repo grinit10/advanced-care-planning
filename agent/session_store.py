@@ -21,7 +21,6 @@ import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-
 from typing import cast
 
 import redis.asyncio as aioredis
