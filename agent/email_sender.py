@@ -19,7 +19,7 @@ import os
 from typing import cast
 
 import docx
-from azure.communication.email import EmailClient, SendEmailResult
+from azure.communication.email import EmailClient
 from docx.shared import Pt, RGBColor
 from docx.styles.style import _ParagraphStyle
 
@@ -292,11 +292,11 @@ def send_plan_email(
         client = EmailClient.from_connection_string(conn_str)
         poller = client.begin_send(email_message)
         # begin_send() stubs return JSON; cast to the real runtime type
-        result = cast(SendEmailResult, poller.result())
+        result = cast(dict, poller.result())
         logger.info(
             "Sent ACP plan report and transcript to %s (message ID: %s)",
             to_email,
-            result.message_id,
+            result.get("id"),
         )
         return True
     except Exception as e:
