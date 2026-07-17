@@ -104,7 +104,9 @@ class SessionStore:
 
     async def get_preferences_json(self, room_id: str) -> dict:
         """Get the full nested preferences JSON object."""
-        raw = cast("str | None", await self._r.get(self._key(room_id, "preferences_json")))
+        raw = cast(
+            "str | None", await self._r.get(self._key(room_id, "preferences_json"))
+        )
         if raw:
             try:
                 return json.loads(raw)
