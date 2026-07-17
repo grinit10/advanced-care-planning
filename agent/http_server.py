@@ -218,7 +218,7 @@ async def handle_health(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
 
 
-async def handle_events(request: web.Request) -> web.Response:
+async def handle_events(request: web.Request) -> web.StreamResponse:
     """Server-Sent Events endpoint for live preference/plan updates.
 
     Instead of the frontend polling every 1s, this endpoint streams
@@ -293,7 +293,7 @@ async def handle_events(request: web.Request) -> web.Response:
     return response
 
 
-async def handle_get_recording(request: web.Request) -> web.Response:
+async def handle_get_recording(request: web.Request) -> web.FileResponse | web.Response:
     """Serve the conversation audio recording as a downloadable WAV file."""
     room_id = request.match_info["room_id"]
     store = await _get_store()

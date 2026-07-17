@@ -83,7 +83,9 @@ class ConversationRecorder:
                         break
                     frame = getattr(event, "frame", event)
                     # frame.data is a memoryview/numpy array; convert to bytes
-                    self._audio_frames.append(frame.data.tobytes())
+                    raw = getattr(frame, "data", None)
+                    if raw is not None:
+                        self._audio_frames.append(bytes(raw))
             except Exception as e:
                 if self._recording:
                     logger.error("Audio stream error: %s", e)
@@ -95,7 +97,7 @@ class ConversationRecorder:
         self._recording = False
         for stream in self._all_streams:
             with contextlib.suppress(Exception):
-                stream.close()
+                await stream.aclose()  # type: ignore[attr-defined]
         self._all_streams.clear()
         if self._read_task:
             self._read_task.cancel()
