@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import { SparklesFullPage } from "./ui/SparklesCore";
 
 interface PreJoinProps {
   onJoin: (roomName: string, identity: string) => void;
@@ -11,18 +12,19 @@ export default function PreJoin({ onJoin, connecting }: PreJoinProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    // Use a simple room name — one room per conversation
-    onJoin("acp-room", name.trim());
+    // Generate a unique room name per conversation to isolate sessions
+    const uniqueRoom = `acp-room-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    onJoin(uniqueRoom, name.trim());
   };
 
   return (
-    <div className="prejoin">
+    <SparklesFullPage className="prejoin">
       <div className="prejoin-card">
         <h1>Advanced Care Planning</h1>
         <p className="prejoin-subtitle">
-          Have a private conversation with an AI assistant about your future
-          healthcare wishes. Your voice stays on your device — nothing is
-          recorded or shared.
+          Have a private conversation with an AI assistant about your future healthcare wishes.
+          Audio is processed in real-time by Deepgram (STT/TTS) and Azure OpenAI (LLM) via
+          Australian data centres — no data is stored by these services.
         </p>
 
         <form onSubmit={handleSubmit} className="prejoin-form">
@@ -43,10 +45,9 @@ export default function PreJoin({ onJoin, connecting }: PreJoinProps) {
         </form>
 
         <p className="prejoin-note">
-          You'll need a microphone and speakers. Make sure your browser has
-          permission to use them.
+          You'll need a microphone and speakers. Make sure your browser has permission to use them.
         </p>
       </div>
-    </div>
+    </SparklesFullPage>
   );
 }

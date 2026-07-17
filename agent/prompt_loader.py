@@ -12,7 +12,6 @@ Architecture:
   acp_prompts.py  →  VoicePipelineAgent
 """
 
-import os
 import logging
 from pathlib import Path
 
@@ -175,7 +174,7 @@ def load_prompt(prompt_path: str | None = None) -> str:
         return _builtin_default() + TTS_FORMATTING_RULES
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         if not data or "prompt" not in data:

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 export interface TranscriptMessage {
-  id: number;
+  id: string | number;
   role: "agent" | "user";
   text: string;
 }
@@ -24,9 +24,7 @@ export default function TranscriptPanel({ messages, agentSpeaking }: TranscriptP
       {messages.length === 0 && (
         <div className="transcript-empty">
           <p>Your conversation will appear here.</p>
-          <p className="text-muted">
-            Speak when you're ready — the assistant will respond.
-          </p>
+          <p className="text-muted">Speak when you're ready — the assistant will respond.</p>
         </div>
       )}
 
@@ -37,9 +35,7 @@ export default function TranscriptPanel({ messages, agentSpeaking }: TranscriptP
             key={msg.id}
             className={`transcript-msg msg-${msg.role}${isLastAgent && agentSpeaking ? " speaking" : ""}`}
           >
-            <span className="msg-label">
-              {msg.role === "agent" ? "Assistant" : "You"}
-            </span>
+            <span className="msg-label">{msg.role === "agent" ? "Assistant" : "You"}</span>
             <p>{msg.text}</p>
           </div>
         );

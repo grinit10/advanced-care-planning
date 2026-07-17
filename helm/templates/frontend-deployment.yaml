@@ -25,4 +25,6 @@ spec:
               value: "ws://{{ include "acp.fullname" . }}-livekit:7880"
             - name: VITE_TOKEN_SERVER_URL
               value: "http://{{ include "acp.fullname" . }}-token-server:{{ .Values.tokenServer.port }}"
+            - name: VITE_AGENT_API_URL
+              value: "http://{{ include "acp.fullname" . }}-agent:8082"
           resources: {{ toYaml .Values.frontend.resources | nindent 12 }}

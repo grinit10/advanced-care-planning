@@ -19,10 +19,9 @@ Key schema:
 
 import json
 import logging
-import os
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Optional
+from typing import cast
 
 import redis.asyncio as aioredis
 
@@ -36,32 +35,17 @@ class TranscriptEntry:
     timestamp: float = field(default_factory=time.time)
 
 
-@dataclass
-class SessionData:
-    room_id: str
-    status: str = "active"            # active | closed
-    transcript: list[dict] = field(default_factory=list)
-    preferences: dict = field(default_factory=dict)
-    emails: set = field(default_factory=set)
-    audio_path: Optional[str] = None
-    plan_summary: Optional[str] = None
-    created_at: float = field(default_factory=time.time)
-    participant_identity: str = ""
-
-
 class SessionStore:
     """Redis-backed session store. One instance per agent process."""
 
     def __init__(self, redis_url: str = "redis://redis:6379/1"):
         self.redis_url = redis_url
-        self._redis: Optional[aioredis.Redis] = None
+        self._redis: aioredis.Redis | None = None
         self._prefix = "session"
 
     async def connect(self):
         """Connect to Redis."""
-        self._redis = aioredis.from_url(
-            self.redis_url, decode_responses=True
-        )
+        self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
         await self._redis.ping()
         logger.info("Connected to Redis session store")
 
@@ -72,81 +56,99 @@ class SessionStore:
     def _key(self, room_id: str, *parts: str) -> str:
         return f"{self._prefix}:{room_id}:" + ":".join(parts)
 
+    @property
+    def _r(self) -> aioredis.Redis:  # type: ignore[type-arg]
+        """Return the connected Redis client, raising if not yet connected."""
+        if self._redis is None:
+            raise RuntimeError("SessionStore: not connected — call connect() first")
+        return self._redis
+
     # --- Status ---
 
     async def set_status(self, room_id: str, status: str):
-        await self._redis.set(self._key(room_id, "status"), status)
+        await self._r.set(self._key(room_id, "status"), status)
 
-    async def get_status(self, room_id: str) -> Optional[str]:
-        return await self._redis.get(self._key(room_id, "status"))
+    async def get_status(self, room_id: str) -> str | None:
+        return cast("str | None", await self._r.get(self._key(room_id, "status")))
 
     # --- Metadata ---
 
     async def save_metadata(self, room_id: str, **kwargs):
-        await self._redis.hset(self._key(room_id, "metadata"), mapping=kwargs)
+        await self._r.hset(self._key(room_id, "metadata"), mapping=kwargs)  # type: ignore[arg-type]
 
     # --- Transcript ---
 
     async def add_transcript_entry(self, room_id: str, entry: TranscriptEntry):
         """Append a single transcript entry."""
         key = self._key(room_id, "transcript")
-        await self._redis.rpush(key, json.dumps(asdict(entry)))
+        await self._r.rpush(key, json.dumps(asdict(entry)))
         # Keep only last 500 entries per session
-        await self._redis.ltrim(key, -500, -1)
+        await self._r.ltrim(key, -500, -1)
 
     async def get_transcript(self, room_id: str) -> list[dict]:
         """Get full transcript for a session."""
         key = self._key(room_id, "transcript")
-        raw = await self._redis.lrange(key, 0, -1)
+        raw = await self._r.lrange(key, 0, -1)
         return [json.loads(e) for e in raw]
 
     # --- Preferences ---
 
     async def set_preference(self, room_id: str, key: str, value: str):
-        await self._redis.hset(
-            self._key(room_id, "preferences"), key, value
-        )
+        """Set a single preference key-value pair (flat string storage)."""
+        await self._r.hset(self._key(room_id, "preferences"), key, value)
 
     async def get_preferences(self, room_id: str) -> dict:
-        raw = await self._redis.hgetall(self._key(room_id, "preferences"))
+        """Get all preferences. Returns a flat dict from Redis."""
+        raw = await self._r.hgetall(self._key(room_id, "preferences"))
         return raw or {}
 
-    async def set_preferences_bulk(self, room_id: str, prefs: dict):
-        if prefs:
-            await self._redis.hset(
-                self._key(room_id, "preferences"), mapping=prefs
-            )
+    async def get_preferences_json(self, room_id: str) -> dict:
+        """Get the full nested preferences JSON object."""
+        raw = cast(
+            "str | None", await self._r.get(self._key(room_id, "preferences_json"))
+        )
+        if raw:
+            try:
+                return json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return {}
+
+    async def save_preferences_json(self, room_id: str, prefs: dict):
+        """Save the full nested preferences JSON object (replaces entirely)."""
+        await self._r.set(
+            self._key(room_id, "preferences_json"),
+            json.dumps(prefs, default=str),
+        )
 
     # --- Emails ---
 
     async def add_email(self, room_id: str, email: str):
-        await self._redis.sadd(self._key(room_id, "emails"), email.lower())
+        await self._r.sadd(self._key(room_id, "emails"), email.lower())
 
     async def get_emails(self, room_id: str) -> list[str]:
-        raw = await self._redis.smembers(self._key(room_id, "emails"))
-        return sorted(raw) if raw else []
+        raw = await self._r.smembers(self._key(room_id, "emails"))
+        return sorted(str(e) for e in raw) if raw else []
 
     # --- Audio ---
 
     async def set_audio_path(self, room_id: str, path: str):
-        await self._redis.set(self._key(room_id, "audio_path"), path)
+        await self._r.set(self._key(room_id, "audio_path"), path)
 
-    async def get_audio_path(self, room_id: str) -> Optional[str]:
-        return await self._redis.get(self._key(room_id, "audio_path"))
+    async def get_audio_path(self, room_id: str) -> str | None:
+        return cast("str | None", await self._r.get(self._key(room_id, "audio_path")))
 
     # --- Plan Summary ---
 
     async def set_plan_summary(self, room_id: str, summary: str):
-        await self._redis.set(self._key(room_id, "plan_summary"), summary)
+        await self._r.set(self._key(room_id, "plan_summary"), summary)
 
-    async def get_plan_summary(self, room_id: str) -> Optional[str]:
-        return await self._redis.get(self._key(room_id, "plan_summary"))
+    async def get_plan_summary(self, room_id: str) -> str | None:
+        return cast("str | None", await self._r.get(self._key(room_id, "plan_summary")))
 
     # --- Session lifecycle ---
 
-    async def create_session(
-        self, room_id: str, participant_identity: str = ""
-    ):
+    async def create_session(self, room_id: str, participant_identity: str = ""):
         """Initialise a new session."""
         await self.set_status(room_id, "active")
         await self.save_metadata(
@@ -154,7 +156,9 @@ class SessionStore:
             created_at=str(time.time()),
             participant_identity=participant_identity,
         )
-        logger.info("Session created: room=%s participant=%s", room_id, participant_identity)
+        logger.info(
+            "Session created: room=%s participant=%s", room_id, participant_identity
+        )
 
     async def close_session(self, room_id: str) -> dict:
         """Close a session and return all data before deletion."""
@@ -165,17 +169,13 @@ class SessionStore:
         cursor = 0
         deleted = 0
         while True:
-            cursor, keys = await self._redis.scan(
-                cursor, match=pattern, count=100
-            )
+            cursor, keys = await self._r.scan(cursor, match=pattern, count=100)
             if keys:
-                await self._redis.delete(*keys)
+                await self._r.delete(*keys)
                 deleted += len(keys)
             if cursor == 0:
                 break
-        logger.info(
-            "Session closed: room=%s (%d keys deleted)", room_id, deleted
-        )
+        logger.info("Session closed: room=%s (%d keys deleted)", room_id, deleted)
         return data
 
     async def get_session_data(self, room_id: str) -> dict:
@@ -185,6 +185,7 @@ class SessionStore:
             "status": await self.get_status(room_id),
             "transcript": await self.get_transcript(room_id),
             "preferences": await self.get_preferences(room_id),
+            "preferences_json": await self.get_preferences_json(room_id),
             "emails": await self.get_emails(room_id),
             "audio_path": await self.get_audio_path(room_id),
             "plan_summary": await self.get_plan_summary(room_id),
