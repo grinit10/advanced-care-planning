@@ -219,3 +219,253 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
         else:
             result[key] = base[key]
     return result
+
+
+def to_fhir_questionnaire_response(
+    preferences: dict[str, Any], patient_name: str = ""
+) -> dict[str, Any]:
+    """Convert extracted preferences to a standard FHIR QuestionnaireResponse resource."""
+    import datetime
+
+    # Base structure
+    fhir_response = {
+        "resourceType": "QuestionnaireResponse",
+        "status": "completed",
+        "authored": datetime.datetime.utcnow().isoformat() + "Z",
+        "subject": {"display": patient_name or "Anonymous Patient"},
+        "item": [],
+    }
+
+    # 1. Substitute Decision Maker
+    sdm = preferences.get("substitute_decision_maker", {})
+    if sdm.get("discussed"):
+        fhir_response["item"].append(
+            {
+                "linkId": "substitute_decision_maker",
+                "text": "Substitute Decision-Maker",
+                "item": [
+                    {
+                        "linkId": "sdm_name",
+                        "text": "Name",
+                        "answer": [{"valueString": sdm.get("name") or "Not provided"}],
+                    },
+                    {
+                        "linkId": "sdm_relationship",
+                        "text": "Relationship",
+                        "answer": [
+                            {
+                                "valueString": sdm.get("relationship")
+                                or "Not provided"
+                            }
+                        ],
+                    },
+                    {
+                        "linkId": "sdm_notes",
+                        "text": "Notes",
+                        "answer": [{"valueString": sdm.get("notes") or ""}],
+                    },
+                ],
+            }
+        )
+
+    # 2. Quality of Life
+    qol = preferences.get("quality_of_life", {})
+    if qol.get("discussed"):
+        qol_item = {
+            "linkId": "quality_of_life",
+            "text": "Quality of Life",
+            "item": [
+                {
+                    "linkId": "qol_values",
+                    "text": "Core Values",
+                    "answer": [
+                        {"valueString": val} for val in qol.get("values", []) if val
+                    ],
+                },
+                {
+                    "linkId": "qol_fears",
+                    "text": "Fears & Concerns",
+                    "answer": [
+                        {"valueString": fear} for fear in qol.get("fears", []) if fear
+                    ],
+                },
+                {
+                    "linkId": "qol_notes",
+                    "text": "Notes",
+                    "answer": [{"valueString": qol.get("notes") or ""}],
+                },
+            ],
+        }
+        fhir_response["item"].append(qol_item)
+
+    # 3. Treatment Preferences
+    tx = preferences.get("treatment_preferences", {})
+    if tx.get("discussed"):
+        fhir_response["item"].append(
+            {
+                "linkId": "treatment_preferences",
+                "text": "Treatment Preferences",
+                "item": [
+                    {
+                        "linkId": "tx_life_support",
+                        "text": "Life Support",
+                        "answer": [
+                            {
+                                "valueString": str(
+                                    tx.get("life_support") or "Not discussed"
+                                )
+                            }
+                        ],
+                    },
+                    {
+                        "linkId": "tx_cpr",
+                        "text": "CPR",
+                        "answer": [
+                            {"valueString": str(tx.get("cpr") or "Not discussed")}
+                        ],
+                    },
+                    {
+                        "linkId": "tx_feeding_tubes",
+                        "text": "Feeding Tubes",
+                        "answer": [
+                            {
+                                "valueString": str(
+                                    tx.get("feeding_tubes") or "Not discussed"
+                                )
+                            }
+                        ],
+                    },
+                    {
+                        "linkId": "tx_pain_management",
+                        "text": "Pain Management",
+                        "answer": [
+                            {
+                                "valueString": str(
+                                    tx.get("pain_management") or "Not discussed"
+                                )
+                            }
+                        ],
+                    },
+                    {
+                        "linkId": "tx_notes",
+                        "text": "Notes",
+                        "answer": [{"valueString": tx.get("notes") or ""}],
+                    },
+                ],
+            }
+        )
+
+    # 4. Values & Beliefs
+    pb = preferences.get("personal_beliefs", {})
+    if pb.get("discussed"):
+        fhir_response["item"].append(
+            {
+                "linkId": "personal_beliefs",
+                "text": "Values & Beliefs",
+                "item": [
+                    {
+                        "linkId": "pb_faith_role",
+                        "text": "Role of Faith/Spirituality",
+                        "answer": [
+                            {
+                                "valueString": pb.get("faith_role") or "Not discussed"
+                            }
+                        ],
+                    },
+                    {
+                        "linkId": "pb_cultural_values",
+                        "text": "Cultural Values",
+                        "answer": [
+                            {
+                                "valueString": val}
+                            for val in pb.get("cultural_values", [])
+                            if val
+                        ],
+                    },
+                    {
+                        "linkId": "pb_notes",
+                        "text": "Notes",
+                        "answer": [{"valueString": pb.get("notes") or ""}],
+                    },
+                ],
+            }
+        )
+
+    # 5. Specific Scenarios
+    ss = preferences.get("specific_scenarios", {})
+    if ss.get("discussed"):
+        fhir_response["item"].append(
+            {
+                "linkId": "specific_scenarios",
+                "text": "Specific Scenarios",
+                "item": [
+                    {
+                        "linkId": "ss_dementia",
+                        "text": "Dementia Scenario",
+                        "answer": [
+                            {"valueString": ss.get("dementia") or "Not discussed"}
+                        ],
+                    },
+                    {
+                        "linkId": "ss_coma",
+                        "text": "Permanent Coma Scenario",
+                        "answer": [{"valueString": ss.get("coma") or "Not discussed"}],
+                    },
+                    {
+                        "linkId": "ss_terminal_illness",
+                        "text": "Terminal Illness Scenario",
+                        "answer": [
+                            {
+                                "valueString": ss.get("terminal_illness")
+                                or "Not discussed"
+                            }
+                        ],
+                    },
+                    {
+                        "linkId": "ss_notes",
+                        "text": "Notes",
+                        "answer": [{"valueString": ss.get("notes") or ""}],
+                    },
+                ],
+            }
+        )
+
+    # 6. Dignity & Values
+    dv = preferences.get("dignity_and_values", {})
+    if dv.get("discussed"):
+        fhir_response["item"].append(
+            {
+                "linkId": "dignity_and_values",
+                "text": "Dignity & Values",
+                "item": [
+                    {
+                        "linkId": "dv_meaning_of_life",
+                        "text": "What Gives Life Meaning",
+                        "answer": [
+                            {
+                                "valueString": val}
+                            for val in dv.get("meaning_of_life", [])
+                            if val
+                        ],
+                    },
+                    {
+                        "linkId": "dv_dignity_definition",
+                        "text": "Definition of Dignity",
+                        "answer": [
+                            {
+                                "valueString": dv.get("dignity_definition")
+                                or "Not discussed"
+                            }
+                        ],
+                    },
+                    {
+                        "linkId": "dv_notes",
+                        "text": "Notes",
+                        "answer": [{"valueString": dv.get("notes") or ""}],
+                    },
+                ],
+            }
+        )
+
+    return fhir_response
+

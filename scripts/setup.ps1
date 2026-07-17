@@ -32,8 +32,8 @@ try {
     exit 1
 }
 
-# Step 2: Check .env file
-Write-Host "[2/4] Checking configuration..." -ForegroundColor Yellow
+# Step 2: Check .env file and detect IP/Ports
+Write-Host "[2/5] Checking configuration and network ports..." -ForegroundColor Yellow
 $envPath = Join-Path (Get-Location) ".env"
 $envExamplePath = Join-Path (Get-Location) ".env.example"
 if (-not (Test-Path $envPath)) {
@@ -47,11 +47,84 @@ if (-not (Test-Path $envPath)) {
     }
 }
 
+# 2a. Detect Host LAN IP
+Write-Host "  🔍 Detecting host LAN IP..." -ForegroundColor Yellow
+$adapter = Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object { $_.PrefixOrigin -eq 'Dhcp' } |
+    Sort-Object InterfaceMetric |
+    Select-Object -First 1
+
+if (-not $adapter) {
+    $adapter = Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object { $_.InterfaceAlias -notlike '*Loopback*' -and
+                       $_.PrefixOrigin -ne 'WellKnown' -and
+                       $_.IPAddress -notlike '169.254.*' -and
+                       $_.IPAddress -notlike '127.*' } |
+        Sort-Object InterfaceMetric |
+        Select-Object -First 1
+}
+
+if (-not $adapter) {
+    Write-Host "  ⚠️  Could not detect host IP automatically. Set HOST_IP manually in .env" -ForegroundColor Yellow
+    $HOST_IP = ""
+} else {
+    $HOST_IP = $adapter.IPAddress
+    Write-Host "  ✅ Detected host IP: $HOST_IP (on $($adapter.InterfaceAlias))" -ForegroundColor Green
+}
+
+# 2b. Check Port Availability for Frontend
+Write-Host "  🔍 Checking port availability for frontend..." -ForegroundColor Yellow
+$FRONTEND_PORT = 5173
+while ($true) {
+    try {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $FRONTEND_PORT)
+        $listener.Start()
+        $listener.Stop()
+        break
+    } catch {
+        Write-Host "  ⚠️  Port $FRONTEND_PORT is already in use. Trying next port..." -ForegroundColor Yellow
+        $FRONTEND_PORT++
+    }
+}
+Write-Host "  ✅ Selected port: $FRONTEND_PORT" -ForegroundColor Green
+
+# 2c. Write/Update .env
+$content = Get-Content $envPath
+$updatedHostIp = $false
+$updatedPort = $false
+
+for ($i = 0; $i -lt $content.Count; $i++) {
+    if ($content[$i] -match '^HOST_IP=') {
+        if ($HOST_IP) {
+            $content[$i] = "HOST_IP=$HOST_IP"
+        }
+        $updatedHostIp = $true
+    }
+    if ($content[$i] -match '^FRONTEND_PORT=') {
+        $content[$i] = "FRONTEND_PORT=$FRONTEND_PORT"
+        $updatedPort = $true
+    }
+}
+
+$newContent = @()
+foreach ($line in $content) {
+    $newContent += $line
+}
+
+if (-not $updatedHostIp -and $HOST_IP) {
+    $newContent += "HOST_IP=$HOST_IP"
+}
+if (-not $updatedPort) {
+    $newContent += "FRONTEND_PORT=$FRONTEND_PORT"
+}
+
+$newContent | Set-Content -Path $envPath -Encoding UTF8
+
 # Check if placeholder values remain in .env
 $envContent = Get-Content $envPath -Raw
 if ($envContent -match "your-api-key-here" -or $envContent -match "your-resource-name") {
     Write-Host "  ⚠️  Your .env file still has placeholder values!" -ForegroundColor Yellow
-    Write-Host "  Opening .env for editing — replace the placeholders with your Azure OpenAI credentials." -ForegroundColor Yellow
+    Write-Host "  Opening .env for editing — replace the placeholders with your credentials." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  Your Azure OpenAI endpoint looks like: https://YOUR-RESOURCE.openai.azure.com" -ForegroundColor Cyan
     Write-Host "  Your Azure OpenAI key looks like:      abc123def456..." -ForegroundColor Cyan
@@ -59,17 +132,17 @@ if ($envContent -match "your-api-key-here" -or $envContent -match "your-resource
     Write-Host "  Press Enter AFTER you've saved the file to continue..." -ForegroundColor Yellow
     Read-Host
 } else {
-    Write-Host "  ✅ .env file looks configured" -ForegroundColor Green
+    Write-Host "  ✅ .env file configured" -ForegroundColor Green
 }
 
 # Step 3: Start Docker Compose
-Write-Host "[3/4] Starting services with Docker Compose..." -ForegroundColor Yellow
+Write-Host "[3/5] Starting services with Docker Compose..." -ForegroundColor Yellow
 Write-Host "  This will download images and start:"
 Write-Host "  • Redis (message broker)"
 Write-Host "  • LiveKit Server (WebRTC media)"
 Write-Host "  • Voice Agent (AI processing)"
 Write-Host "  • Token Server (authentication)"
-Write-Host "  • Frontend (web interface)"
+Write-Host "  • Frontend (web interface on port $FRONTEND_PORT)"
 Write-Host ""
 
 docker compose up -d
@@ -91,7 +164,7 @@ $maxRetries = 12
 $ready = $false
 for ($i = 1; $i -le $maxRetries; $i++) {
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:5173" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
+        $response = Invoke-WebRequest -Uri "http://localhost:$FRONTEND_PORT" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
         if ($response.StatusCode -eq 200) {
             $ready = $true
             break
@@ -111,11 +184,11 @@ if ($ready) {
 # Step 5: Open browser
 Write-Host "[5/5] Opening the app..." -ForegroundColor Yellow
 try {
-    Start-Process "http://localhost:5173"
+    Start-Process "http://localhost:$FRONTEND_PORT"
     Write-Host "  ✅ Browser opened!" -ForegroundColor Green
 } catch {
     Write-Host "  ⚠️  Could not open browser automatically." -ForegroundColor Yellow
-    Write-Host "  Open http://localhost:5173 manually."
+    Write-Host "  Open http://localhost:$FRONTEND_PORT manually."
 }
 
 Write-Host ""
@@ -123,7 +196,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  All set! Here's what you can do:" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  🌐 Open the app:     http://localhost:5173"
+Write-Host "  🌐 Open the app:     http://localhost:$FRONTEND_PORT"
 Write-Host ""
 Write-Host "  📋 View agent logs:  docker compose logs -f agent"
 Write-Host "  🛑 Stop everything:  docker compose down"

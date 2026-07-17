@@ -12,8 +12,11 @@ Imagine a situation where you become seriously ill or injured, and you cannot sp
 ### 🎯 Purpose of This Solution
 Documenting future wishes can feel intimidating, clinical, or emotionally overwhelming. This solution provides a **friendly, natural voice assistant** that:
 1. **Guides the Conversation**: Gently walks a patient through key topics (substitute decision-makers, treatment preferences, quality of life thresholds, and faith/cultural values) in a conversational, non-threatening way.
-2. **Generates an Actionable Plan**: Dynamically extracts preferences in the background to build a structured summary and downloadable Word document (`.docx`) of their wishes.
-3. **Protects Patient Dignity & Privacy**: Designed specifically for clinical tablets on-site, ensuring zero data is persisted locally and all information is vanished once the session ends.
+2. **Generates an Actionable Plan**: Dynamically extracts preferences in the background to build a structured summary and downloadable Word document (`.docx`) of wishes.
+3. **Clinical EMR Integration (FHIR)**: Supports exporting structured plans directly to the **HL7/FHIR `QuestionnaireResponse`** format, enabling hospitals to ingest patient wishes directly into EMR systems like Epic or Cerner.
+4. **Calming Audio Visualizer & Progress Tracker**: Features a premium canvas-based sinusoidal visualizer and a real-time progress tracker showing how many ACP topics have been successfully discussed.
+5. **Zero-Friction Network Setup**: Auto-detects network LAN IPs and dynamically resolves local port conflicts (e.g. if port `5173` is busy) on startup.
+6. **Protects Patient Dignity & Privacy**: Designed specifically for clinical tablets on-site, ensuring zero data is persisted locally and all information is vaporized once the session ends.
 
 ---
 

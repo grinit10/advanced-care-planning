@@ -26,6 +26,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
 from email_sender import is_configured as email_configured
 from email_sender import send_plan_email
+from preference_extractor import to_fhir_questionnaire_response
 from session_store import SessionStore
 
 # CORS headers — allow the frontend dev server to call this API
@@ -542,6 +543,30 @@ async def handle_get_plan_docx(request: web.Request) -> web.Response:
     )
 
 
+async def handle_get_fhir_json(request: web.Request) -> web.Response:
+    """Export the care preferences as a FHIR-compliant QuestionnaireResponse JSON."""
+    room_id = request.match_info["room_id"]
+    store = await _get_store()
+
+    preferences = await store.get_preferences_json(room_id)
+    if not preferences:
+        return web.json_response({"error": "No preferences available to export"}, status=404)
+
+    # Get participant name if available
+    metadata = await store._r.hgetall(store._key(room_id, "metadata"))
+    patient_name = metadata.get("participant_identity", "Anonymous Patient")
+
+    fhir_data = to_fhir_questionnaire_response(preferences, patient_name=patient_name)
+
+    filename = f"acp-fhir-record-{room_id}.json"
+    return web.json_response(
+        fhir_data,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
 async def handle_get_transcript_json(request: web.Request) -> web.Response:
     """Return the transcript as JSON for live polling."""
     room_id = request.match_info["room_id"]
@@ -759,6 +784,7 @@ def create_app() -> web.Application:
     app.router.add_get("/recording/{room_id}", handle_get_recording)
     app.router.add_get("/transcript/{room_id}", handle_get_transcript_download)
     app.router.add_get("/plan-docx/{room_id}", handle_get_plan_docx)
+    app.router.add_get("/fhir-export/{room_id}", handle_get_fhir_json)
     app.router.add_get("/transcript-json/{room_id}", handle_get_transcript_json)
     app.router.add_post("/email/{room_id}", handle_add_email)
     app.router.add_post("/send-plan/{room_id}", handle_send_plan)

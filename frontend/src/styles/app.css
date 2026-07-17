@@ -1279,3 +1279,73 @@ body {
     font-size: 1rem;
   }
 }
+
+/* ============================================================
+   Enhanced Visual Upgrades (Glows, Progress Bar, Glassmorphism)
+   ============================================================ */
+
+.pref-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.progress-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.progress-text {
+  font-size: 0.725rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  letter-spacing: 0.06em;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), #4a8c6f);
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 6px rgba(90, 168, 154, 0.3);
+}
+
+/* Dynamic Glassmorphic upgrade for discussed ACP cards */
+.acp-card.discussed {
+  background: linear-gradient(135deg, var(--color-prefs-discussed), color-mix(in srgb, var(--color-prefs-discussed) 85%, var(--color-surface)));
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  animation: card-discussed-glow 2.5s infinite alternate ease-in-out;
+}
+
+.acp-card.discussed .acp-card-title {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+@keyframes card-discussed-glow {
+  from {
+    box-shadow: var(--shadow-sm);
+    transform: translateY(0);
+  }
+  to {
+    box-shadow: 0 4px 15px var(--color-primary-glow);
+    transform: translateY(-1px);
+  }
+}
+
